@@ -75,6 +75,10 @@ Supported event types include:
 
 - `WEBHOOK_SECRET` - Secret for signature validation (default: gem_webhook_secret)
 
+## Security Note
+
+For MVP/testing purposes, the webhook endpoint accepts requests without signature validation to enable easy testing with `seed.sh`. For production use with Bentley iTwin, configure `WEBHOOK_SECRET` to match your Bentley webhook configuration. When a signature header is provided, it will be validated.
+
 ## Notes
 
 - Importing to a new Replit account changes the domain
