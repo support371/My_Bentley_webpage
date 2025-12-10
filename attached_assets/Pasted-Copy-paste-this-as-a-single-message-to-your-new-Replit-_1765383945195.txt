@@ -1,0 +1,144 @@
+Copy-paste this as a single message to your new Replit agent. It is designed to be a one-time, end-to-end remediation directive with zero dependency on you.
+
+⸻
+
+MESSAGE TO NEW AGENT (COPY/PASTE)
+
+You are the Replit implementation agent for the Bentley iTwin Webhooks + Dashboard MVP. The project was imported into a new account, so prior URLs, runtime assumptions, and agent-generated scripts may be invalid. Your mandate is to identify the actual runtime, normalize the stack, restore the dashboard endpoints, and produce the correct live URLs. Do not ask the user for inputs. Do the entire workstream yourself.
+
+Success Criteria (Non-negotiable)
+	1.	Returning HTTP 200 for:
+	•	GET /
+	•	GET /health
+	•	POST /webhook
+	•	GET /events
+	•	GET /dashboard
+	•	GET /dashboard/feed
+	2.	/dashboard serves a working MVP UI that auto-refreshes.
+	3.	/dashboard/feed returns valid JSON with meta, kpis, health, recentEvents, insights.
+	4.	Provide final URLs for both environments:
+	•	Preview/dev: https://<REPL_SLUG>.<REPL_OWNER>.replit.dev/dashboard
+	•	Deployment/prod: https://<REPL_SLUG>.<REPL_OWNER>.replit.app/dashboard
+	5.	Ship a single smoke test script that runs cleanly without syntax errors.
+
+⸻
+
+Phase 1 — Detect the Real Entrypoint and Stop the Runtime Mismatch
+	1.	Inspect top-level files:
+	•	ls -la
+	•	Identify presence of main.py, app.py, index.js, server.js, package.json, requirements.txt, .replit, replit.nix.
+	2.	Determine active runtime by checking .replit:
+	•	If .replit points to uvicorn, it is Python/FastAPI.
+	•	If it points to node, it is Node/Express.
+	3.	If both Node and Python files exist, select one stack and remove ambiguity:
+	•	Prefer the stack referenced by .replit and current logs.
+	•	Update .replit to exactly one deterministic run command.
+
+⸻
+
+Phase 2 — Normalize to One Known-Good MVP Implementation
+
+Implement the full MVP in the chosen stack.
+
+Option A (Preferred if current logs show uvicorn): FastAPI
+Create/replace:
+	•	requirements.txt (FastAPI + uvicorn pinned)
+	•	main.py implementing:
+	•	In-memory event store
+	•	/, /health, /webhook, /events
+	•	/dashboard (simple HTML with KPI cards + table)
+	•	/dashboard/feed (KPI + health + insights)
+Update .replit:
+	•	run = "uvicorn main:app --host 0.0.0.0 --port 5000"
+
+Option B (If project is clearly Node): Express
+Create/replace:
+	•	package.json + index.js
+	•	Implement the same endpoints as above.
+Update .replit:
+	•	run = "node index.js"
+
+⸻
+
+Phase 3 — Make the Dashboard Resilient
+	1.	/dashboard must:
+	•	Use vanilla HTML/CSS/JS.
+	•	Poll /dashboard/feed?timeRange=24h every 15 seconds.
+	•	Render:
+	•	4 KPI cards
+	•	Health line
+	•	AI summary
+	•	Recent events table (last 20)
+	2.	Add safe fallback naming:
+	•	If missing names, display iTwin-<id8> and iModel-<id8>.
+	3.	Ensure /events returns newest-first.
+
+⸻
+
+Phase 4 — Add Safe, Single-File Tooling
+
+Create these scripts with correct heredoc quoting to avoid prior failures:
+	1.	smoke-test.sh
+Must:
+
+	•	Detect and print inferred BASE URL.
+	•	Test endpoints locally against:
+	•	http://127.0.0.1:5000 if FastAPI
+	•	http://127.0.0.1:3000 if Node
+	•	Print PASS/FAIL without bash syntax errors.
+
+	2.	seed.sh
+Must insert 10–20 test events through POST /webhook to populate the dashboard.
+
+⸻
+
+Phase 5 — Validate Locally Then Validate Public
+	1.	Run the app using the .replit command.
+	2.	Run:
+	•	bash smoke-test.sh
+	•	bash seed.sh
+	3.	Confirm:
+	•	local /dashboard renders
+	•	/dashboard/feed returns JSON with required keys
+	4.	Confirm public routes return 200 from the Replit Preview URL.
+
+⸻
+
+Phase 6 — Deliverable Package
+
+Update README.md with:
+	1.	Confirmed stack (FastAPI or Express).
+	2.	Exact endpoint list.
+	3.	Correct URLs using dynamic Replit pattern:
+	•	Dev: https://<REPL_SLUG>.<REPL_OWNER>.replit.dev/dashboard
+	•	Prod: https://<REPL_SLUG>.<REPL_OWNER>.replit.app/dashboard
+	4.	Copy-paste commands for:
+	•	smoke test
+	•	seeding
+	•	verifying health
+	5.	Note that importing into a new account changes the domain.
+
+⸻
+
+Non-Functional Requirements
+	•	No secrets embedded in code.
+	•	No fragile scripts.
+	•	No partial implementation.
+	•	Keep the MVP lightweight and production-safe for webhook intake.
+
+⸻
+
+Final Output to User
+
+When finished, provide:
+	1.	The confirmed dashboard endpoint URL for dev and prod.
+	2.	A short statement: “All required endpoints return 200.”
+	3.	The exact smoke-test.sh command the user can run if needed.
+
+⸻
+
+End of agent instruction
+
+⸻
+
+If your new agent follows this, they will stop the runtime confusion, rebuild the canonical endpoint surface, and give you the exact dashboard URL for the new account with minimal iteration.

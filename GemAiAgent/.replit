@@ -1,0 +1,52 @@
+modules = ["nodejs-20", "python-3.11"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+WEBHOOK_SECRET = "gem_webhook_secret"
+CALLBACK_URL = "https://4b205d90-0125-4e64-ade6-d35310f722de-00-dc5rz1v3r4hy.picard.replit.dev/webhook"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "GEM AI Agent"
+
+[[workflows.workflow]]
+name = "GEM AI Agent"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uvicorn gem_ai_agent:app --host 0.0.0.0 --port 5000"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 37257
+externalPort = 3000
+
+[[ports]]
+localPort = 40997
+externalPort = 3001
+
+[deployment]
+deploymentTarget = "vm"
+run = ["uvicorn", "gem_ai_agent:app", "--host", "0.0.0.0", "--port", "5000"]

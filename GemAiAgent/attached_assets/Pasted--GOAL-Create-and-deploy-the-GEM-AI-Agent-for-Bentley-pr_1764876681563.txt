@@ -1,0 +1,106 @@
+# === GOAL ===
+Create and deploy the “GEM-AI-Agent-for-Bentley” project in this Replit workspace.
+The agent must integrate Bentley iTwin Webhooks (v2) with the DeepSeek AI reasoning API.
+After setup, push all code to a new GitHub repository and deploy it here so it’s live with a public URL.
+
+# === BUILD STEPS ===
+1. Initialize a new Python project in this workspace.
+
+2. Create a single source file named gem_ai_agent.py containing the following full application:
+
+------------------------------------------------------------
+import os, hmac, hashlib, json, requests, logging, asyncio
+from fastapi import FastAPI, Request, HTTPException
+from datetime import datetime
+from pathlib import Path
+from base64 import b64encode
+
+BENTLEY_CLIENT_ID     = os.getenv("BENTLEY_CLIENT_ID")
+BENTLEY_CLIENT_SECRET = os.getenv("BENTLEY_CLIENT_SECRET")
+DEEPSEEK_API_KEY      = os.getenv("DEEPSEEK_API_KEY")
+WEBHOOK_SECRET        = os.getenv("WEBHOOK_SECRET","gem_webhook_secret")
+CALLBACK_URL          = os.getenv("CALLBACK_URL","https://your-repl-url.repl.co/webhook")
+
+LOG_DIR = Path("logs"); LOG_DIR.mkdir(exist_ok=True)
+logging.basicConfig(filename=LOG_DIR/"agent.log",level=logging.INFO,
+                    format="%(asctime)s [%(levelname)s] %(message)s")
+app = FastAPI(title="GEM AI Agent for Bentley",version="1.0")
+
+def verify_signature(payload: bytes, signature: str)->bool:
+    mac=hmac.new(WEBHOOK_SECRET.encode(),payload,hashlib.sha256).hexdigest()
+    return hmac.compare_digest(mac,signature or "")
+
+def call_deepseek(prompt:str)->str:
+    try:
+        r=requests.post(
+            "https://api.deepseek.ai/v1/chat/completions",
+            headers={"Authorization":f"Bearer {DEEPSEEK_API_KEY}",
+                     "Content-Type":"application/json"},
+            json={"model":"deepseek-chat",
+                  "messages":[
+                     {"role":"system","content":
+                      "You are an AI assistant for Bentley iTwin synchronization."},
+                     {"role":"user","content":prompt}],
+                  "temperature":0.4},timeout=30)
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        logging.error(f"DeepSeek error: {e}")
+        return "AI analysis unavailable."
+
+def log_event(event_type,summary,payload):
+    f=LOG_DIR/f"{datetime.utcnow().isoformat()}_{event_type}.md"
+    f.write_text(f"# {event_type}\n\n{summary}\n\n---\n{json.dumps(payload,indent=2)}")
+    logging.info(f"Logged {event_type}")
+
+@app.get("/health")
+async def health(): return {"status":"running","time":datetime.utcnow().isoformat()}
+
+@app.post("/webhook")
+async def webhook(req:Request):
+    body=await req.body()
+    sig=req.headers.get("signature","")
+    if not verify_signature(body,sig):
+        raise HTTPException(status_code=401,detail="Invalid signature")
+    data=await req.json()
+    event=data.get("eventType","UnknownEvent")
+    prompt=f"Summarize Bentley event:\n{json.dumps(data,indent=2)}"
+    summary=await asyncio.to_thread(call_deepseek,prompt)
+    await asyncio.to_thread(log_event,event,summary,data)
+    return {"received":event,"summary":summary}
+
+if __name__=="__main__":
+    import uvicorn; uvicorn.run(app,host="0.0.0.0",port=8080)
+------------------------------------------------------------
+
+3. Create requirements.txt with:
+fastapi
+uvicorn[standard]
+requests
+
+4. Install dependencies.
+
+5. In the Secrets panel, create environment variables:
+BENTLEY_CLIENT_ID=<your-client-id>
+BENTLEY_CLIENT_SECRET=<your-client-secret>
+DEEPSEEK_API_KEY=<your-deepseek-api-key>
+WEBHOOK_SECRET=gem_webhook_secret
+CALLBACK_URL=<will be filled after Replit deploys>
+
+6. Configure the Run command to:
+uvicorn gem_ai_agent:app --host 0.0.0.0 --port 8080
+
+7. Start the Repl. When running, verify “/health” endpoint works.
+
+8. Once it runs successfully, create a new public GitHub repository named
+   GEM-AI-Agent-for-Bentley and push all code, including requirements.txt and gem_ai_agent.py.
+
+9. Return to this Repl and deploy the service (Replit Deployments → Reserved VM or Always-On option).
+   After deployment, display the final public URL (the webhook endpoint will be at /webhook).
+
+10. Output summary:
+   - ✅ GitHub repo URL
+   - ✅ Replit deployment URL (the active agent endpoint)
+   - ✅ Confirmation that /health returns { "status": "running" }
+
+# === END INSTRUCTION ===
