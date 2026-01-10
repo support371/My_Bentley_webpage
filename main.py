@@ -86,8 +86,8 @@ def extract_event_info(data: dict) -> dict:
     }
 
 
-@app.get("/")
-async def root():
+@app.get("/api/info")
+async def info():
     return {
         "service": "Bentley iTwin Webhooks Dashboard MVP",
         "version": "1.1",
@@ -96,7 +96,7 @@ async def root():
             "health": "/health",
             "webhook": "/webhook",
             "events": "/events",
-            "dashboard": "/dashboard",
+            "dashboard": "/",
             "dashboard_feed": "/dashboard/feed"
         },
         "supported_events": len(SUPPORTED_EVENT_TYPES)
@@ -758,9 +758,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def dashboard():
     return HTMLResponse(content=DASHBOARD_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
 
 
 if __name__ == "__main__":
