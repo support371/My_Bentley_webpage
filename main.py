@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Bentley iTwin Webhooks Dashboard MVP",
-    version="1.0",
+    version="1.1",
     description="Webhook service for Bentley iTwin with dashboard"
 )
 
@@ -90,7 +90,7 @@ def extract_event_info(data: dict) -> dict:
 async def root():
     return {
         "service": "Bentley iTwin Webhooks Dashboard MVP",
-        "version": "1.0",
+        "version": "1.1",
         "status": "running",
         "endpoints": {
             "health": "/health",
@@ -223,165 +223,304 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bentley iTwin Dashboard</title>
     <style>
+        :root {
+            --primary: #2980b9;
+            --primary-dark: #1a5276;
+            --bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text: #333;
+            --text-muted: #666;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --idle: #95a5a6;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f7fa;
-            color: #333;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
+            line-height: 1.6;
         }
         .header {
-            background: linear-gradient(135deg, #1a5276 0%, #2980b9 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
-            padding: 20px 30px;
+            padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header h1 { font-size: 1.25rem; font-weight: 600; }
         .header .status {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 0.9rem;
+            gap: 8px;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
         }
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: #2ecc71;
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
             animation: pulse 2s infinite;
         }
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
         }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        
+        .dashboard-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
         .time-filter {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 0.5rem;
+            background: white;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         .time-filter button {
-            padding: 8px 16px;
-            border: 1px solid #ddd;
-            background: white;
+            padding: 6px 14px;
+            border: none;
+            background: transparent;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
             transition: all 0.2s;
         }
         .time-filter button.active {
-            background: #2980b9;
+            background: var(--primary);
             color: white;
-            border-color: #2980b9;
         }
         .time-filter button:hover:not(.active) { background: #f0f0f0; }
+        
+        .refresh-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .btn-refresh {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+        }
+        .btn-refresh:hover { background: #f9f9f9; border-color: var(--primary); }
+
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
         }
         .kpi-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 4px solid var(--primary);
+            transition: transform 0.2s;
         }
+        .kpi-card:hover { transform: translateY(-3px); }
         .kpi-card h3 {
-            font-size: 0.85rem;
-            color: #666;
+            font-size: 0.75rem;
+            color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
         }
         .kpi-card .value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2980b9;
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--primary);
         }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 1.5rem;
+        }
+        @media (max-width: 1024px) {
+            .main-content { grid-template-columns: 1fr; }
+        }
+        
+        .content-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
         .insights-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
         .insights-card h3 {
             font-size: 0.9rem;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }
-        .insights-card p { font-size: 1rem; line-height: 1.5; }
-        .health-bar {
-            background: white;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 20px;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
             display: flex;
             align-items: center;
-            gap: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            gap: 8px;
         }
+        .insights-card p { font-size: 0.95rem; font-weight: 500; }
+        
+        .health-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .health-info { display: flex; align-items: center; gap: 12px; }
         .health-indicator {
             width: 12px;
             height: 12px;
             border-radius: 50%;
         }
-        .health-indicator.healthy { background: #2ecc71; }
-        .health-indicator.busy { background: #f39c12; }
-        .health-indicator.idle { background: #95a5a6; }
-        .events-table {
+        .health-indicator.healthy { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .health-indicator.busy { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
+        .health-indicator.idle { background: var(--idle); }
+        .health-label { font-weight: 600; font-size: 0.9rem; }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .distribution-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .distribution-card h3 {
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .dist-item {
+            margin-bottom: 0.75rem;
+        }
+        .dist-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+        .dist-bar-bg {
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .dist-bar-fg {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+
+        .events-table-card {
             background: white;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        .events-table h3 {
-            padding: 15px 20px;
+        .events-table-card .card-header {
+            padding: 1.25rem;
             border-bottom: 1px solid #eee;
-            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .events-table-card h3 { font-size: 1rem; font-weight: 600; }
+        
+        .table-container {
+            overflow-x: auto;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 600px;
         }
         th, td {
-            padding: 12px 20px;
+            padding: 1rem 1.25rem;
             text-align: left;
             border-bottom: 1px solid #f0f0f0;
         }
         th {
             background: #fafafa;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             text-transform: uppercase;
-            color: #666;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
         }
-        td { font-size: 0.9rem; }
-        tr:hover { background: #f9f9f9; }
-        .event-type {
+        td { font-size: 0.85rem; }
+        tr:hover { background: #f9fbfe; }
+        tr:last-child td { border-bottom: none; }
+        
+        .event-badge {
             display: inline-block;
-            padding: 4px 10px;
-            background: #e8f4fd;
-            color: #2980b9;
+            padding: 3px 8px;
+            background: #eef2f7;
+            color: #4a5568;
             border-radius: 4px;
-            font-size: 0.8rem;
-            font-family: monospace;
+            font-size: 0.75rem;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-weight: 500;
         }
-        .timestamp { color: #888; font-size: 0.85rem; }
+        .event-badge.imodel { background: #e0f2fe; color: #0369a1; }
+        .event-badge.itwin { background: #fef3c7; color: #92400e; }
+        .event-badge.access { background: #fce7f3; color: #9d174d; }
+        
+        .timestamp { color: var(--text-muted); font-size: 0.8rem; }
+        
         .empty-state {
             text-align: center;
-            padding: 60px 20px;
-            color: #888;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
         }
-        .empty-state h3 { margin-bottom: 10px; }
-        .last-update {
+        .empty-state svg { width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.3; }
+        
+        .footer {
             text-align: center;
-            color: #888;
-            font-size: 0.8rem;
-            margin-top: 20px;
+            margin-top: 2rem;
+            padding-bottom: 2rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
     </style>
 </head>
@@ -390,107 +529,215 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <h1>Bentley iTwin Webhooks Dashboard</h1>
         <div class="status">
             <div class="status-dot"></div>
-            <span>Live</span>
+            <span>Live Stream</span>
         </div>
     </div>
+    
     <div class="container">
-        <div class="time-filter">
-            <button data-range="1h">1 Hour</button>
-            <button data-range="6h">6 Hours</button>
-            <button data-range="24h" class="active">24 Hours</button>
-            <button data-range="7d">7 Days</button>
-            <button data-range="30d">30 Days</button>
+        <div class="dashboard-actions">
+            <div class="time-filter">
+                <button data-range="1h">1H</button>
+                <button data-range="6h">6H</button>
+                <button data-range="24h" class="active">24H</button>
+                <button data-range="7d">7D</button>
+                <button data-range="30d">30D</button>
+            </div>
+            
+            <div class="refresh-control">
+                <span id="last-update-time">Just now</span>
+                <button class="btn-refresh" id="manual-refresh">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    Refresh
+                </button>
+            </div>
         </div>
+
         <div class="kpi-grid" id="kpis">
             <div class="kpi-card">
                 <h3>Total Events</h3>
-                <div class="value" id="kpi-total">-</div>
+                <div class="value" id="kpi-total">0</div>
             </div>
             <div class="kpi-card">
                 <h3>Unique iTwins</h3>
-                <div class="value" id="kpi-itwins">-</div>
+                <div class="value" id="kpi-itwins">0</div>
             </div>
             <div class="kpi-card">
                 <h3>Unique iModels</h3>
-                <div class="value" id="kpi-imodels">-</div>
+                <div class="value" id="kpi-imodels">0</div>
             </div>
             <div class="kpi-card">
-                <h3>Event Types</h3>
-                <div class="value" id="kpi-types">-</div>
+                <h3>Event Varieties</h3>
+                <div class="value" id="kpi-types">0</div>
             </div>
         </div>
-        <div class="health-bar">
-            <div class="health-indicator" id="health-dot"></div>
-            <span id="health-text">System Status: Loading...</span>
+
+        <div class="main-content">
+            <div class="content-section">
+                <div class="insights-card">
+                    <h3>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                        AI Insights Summary
+                    </h3>
+                    <p id="insights">Analyzing your webhook data stream...</p>
+                </div>
+
+                <div class="events-table-card">
+                    <div class="card-header">
+                        <h3>Recent Event Feed</h3>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Event Type</th>
+                                    <th>iTwin Resource</th>
+                                    <th>iModel Context</th>
+                                    <th>Received At</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-body">
+                                <tr><td colspan="4" class="empty-state">Waiting for events...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="health-card">
+                    <div class="health-info">
+                        <div class="health-indicator" id="health-dot"></div>
+                        <span class="health-label" id="health-text">Loading...</span>
+                    </div>
+                    <span style="font-size: 0.7rem; color: #888;">System Status</span>
+                </div>
+
+                <div class="distribution-card">
+                    <h3>Event Distribution</h3>
+                    <div id="distribution-body">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="insights-card">
-            <h3>AI Summary</h3>
-            <p id="insights">Loading insights...</p>
+        
+        <div class="footer">
+            Bentley iTwin Webhooks Dashboard MVP v1.1 &bull; Auto-refreshing every 15s
         </div>
-        <div class="events-table">
-            <h3>Recent Events</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Event Type</th>
-                        <th>iTwin</th>
-                        <th>iModel</th>
-                        <th>Received</th>
-                    </tr>
-                </thead>
-                <tbody id="events-body">
-                    <tr><td colspan="4" class="empty-state">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <p class="last-update" id="last-update"></p>
     </div>
+
     <script>
         let currentRange = '24h';
+        let refreshInterval;
         
         async function fetchData() {
             try {
+                const manualBtn = document.getElementById('manual-refresh');
+                manualBtn.style.opacity = '0.5';
+                manualBtn.disabled = true;
+
                 const res = await fetch('/dashboard/feed?timeRange=' + currentRange);
                 const data = await res.json();
                 
-                document.getElementById('kpi-total').textContent = data.kpis.totalEvents;
-                document.getElementById('kpi-itwins').textContent = data.kpis.uniqueITwins;
-                document.getElementById('kpi-imodels').textContent = data.kpis.uniqueIModels;
-                document.getElementById('kpi-types').textContent = data.kpis.eventTypes;
+                // Update KPIs
+                animateValue('kpi-total', data.kpis.totalEvents);
+                animateValue('kpi-itwins', data.kpis.uniqueITwins);
+                animateValue('kpi-imodels', data.kpis.uniqueIModels);
+                animateValue('kpi-types', data.kpis.eventTypes);
                 
+                // Update Health
                 const healthDot = document.getElementById('health-dot');
                 healthDot.className = 'health-indicator ' + data.health;
-                document.getElementById('health-text').textContent = 
-                    'System Status: ' + data.health.charAt(0).toUpperCase() + data.health.slice(1);
+                document.getElementById('health-text').textContent = data.health.toUpperCase();
                 
+                // Update Insights
                 document.getElementById('insights').textContent = data.insights;
                 
+                // Update Table
                 const tbody = document.getElementById('events-body');
                 if (data.recentEvents.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><h3>No Events Yet</h3><p>Webhook events will appear here when received</p></td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg><h3>No Events Found</h3><p>Configure your Bentley webhooks to start receiving data.</p></td></tr>';
                 } else {
                     tbody.innerHTML = data.recentEvents.map(e => {
                         const date = new Date(e.received_at);
-                        const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
-                        return '<tr>' +
-                            '<td><span class="event-type">' + escapeHtml(e.eventType) + '</span></td>' +
-                            '<td>' + escapeHtml(e.iTwinName || '-') + '</td>' +
-                            '<td>' + escapeHtml(e.iModelName || '-') + '</td>' +
-                            '<td class="timestamp">' + timeStr + '</td>' +
-                        '</tr>';
+                        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        const badgeClass = getBadgeClass(e.eventType);
+                        return `<tr>
+                            <td><span class="event-badge ${badgeClass}">${escapeHtml(e.eventType)}</span></td>
+                            <td>${escapeHtml(e.iTwinName || '-')}</td>
+                            <td>${escapeHtml(e.iModelName || '-')}</td>
+                            <td class="timestamp">${timeStr}</td>
+                        </tr>`;
                     }).join('');
                 }
                 
-                document.getElementById('last-update').textContent = 
-                    'Last updated: ' + new Date().toLocaleTimeString();
+                // Update Distribution
+                const distBody = document.getElementById('distribution-body');
+                const total = data.kpis.totalEvents || 1;
+                const sortedTypes = Object.entries(data.eventTypeBreakdown || {}).sort((a,b) => b[1] - a[1]).slice(0, 5);
+                
+                if (sortedTypes.length === 0) {
+                    distBody.innerHTML = '<p style="font-size: 0.8rem; color: #888;">No data available</p>';
+                } else {
+                    distBody.innerHTML = sortedTypes.map(([type, count]) => {
+                        const percent = Math.round((count / total) * 100);
+                        return `<div class="dist-item">
+                            <div class="dist-info">
+                                <span>${type.split('.').slice(-2).join('.')}</span>
+                                <span>${count} (${percent}%)</span>
+                            </div>
+                            <div class="dist-bar-bg">
+                                <div class="dist-bar-fg" style="width: ${percent}%"></div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+                
+                document.getElementById('last-update-time').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+                
+                setTimeout(() => {
+                    manualBtn.style.opacity = '1';
+                    manualBtn.disabled = false;
+                }, 500);
+
             } catch (err) {
-                console.error('Failed to fetch data:', err);
+                console.error('Fetch error:', err);
+                document.getElementById('health-text').textContent = 'OFFLINE';
+                document.getElementById('health-dot').className = 'health-indicator busy';
             }
+        }
+        
+        function getBadgeClass(type) {
+            type = type.toLowerCase();
+            if (type.includes('imodel')) return 'imodel';
+            if (type.includes('itwin')) return 'itwin';
+            if (type.includes('access') || type.includes('role')) return 'access';
+            return '';
+        }
+        
+        function animateValue(id, end) {
+            const obj = document.getElementById(id);
+            const start = parseInt(obj.textContent) || 0;
+            if (start === end) return;
+            
+            const duration = 500;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                obj.textContent = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
         }
         
         function escapeHtml(str) {
             if (!str) return '';
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
         
         document.querySelectorAll('.time-filter button').forEach(btn => {
@@ -502,8 +749,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             });
         });
         
+        document.getElementById('manual-refresh').addEventListener('click', fetchData);
+        
         fetchData();
-        setInterval(fetchData, 15000);
+        refreshInterval = setInterval(fetchData, 15000);
     </script>
 </body>
 </html>"""
