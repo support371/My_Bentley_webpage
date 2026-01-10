@@ -29,8 +29,8 @@ This project is a webhook service for the Bentley iTwin platform that receives w
 - `/dashboard/feed` - JSON data for dashboard
 
 ## URLs
-- Dev: https://workspace.suarezcarolina8.replit.dev/dashboard
-- Prod: https://workspace.suarezcarolina8.replit.app/dashboard
+- Dev: https://gem-ai-agentzip--suarezcarolina8.replit.dev/dashboard
+- Prod: https://gem-ai-agentzip--suarezcarolina8.replit.app/dashboard
 
 ## Recent Changes
 - 2024-12-10: Initial MVP setup with FastAPI
