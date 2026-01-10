@@ -23,12 +23,12 @@ A lightweight webhook service for Bentley iTwin platform with a live dashboard.
 
 ### Development (Preview)
 ```
-https://workspace.suarezcarolina8.replit.dev/dashboard
+https://gem-ai-agentzip--suarezcarolina8.replit.dev/dashboard
 ```
 
 ### Production (Deployed)
 ```
-https://workspace.suarezcarolina8.replit.app/dashboard
+https://gem-ai-agentzip--suarezcarolina8.replit.app/dashboard
 ```
 
 ## Quick Commands
@@ -61,7 +61,7 @@ curl http://127.0.0.1:5000/health
 
 Register your webhook URL with Bentley iTwin:
 ```
-https://workspace.suarezcarolina8.replit.dev/webhook
+https://gem-ai-agentzip--suarezcarolina8.replit.dev/webhook
 ```
 
 Supported event types include:
