@@ -87,7 +87,7 @@ def extract_event_info(data: dict) -> dict:
 
 
 @app.get("/api/info")
-async def info():
+async def api_info():
     return {
         "service": "Bentley iTwin Webhooks Dashboard MVP",
         "version": "1.1",
@@ -96,9 +96,20 @@ async def info():
             "health": "/health",
             "webhook": "/webhook",
             "events": "/events",
-            "dashboard": "/",
+            "dashboard": "/dashboard",
             "dashboard_feed": "/dashboard/feed"
         },
+        "supported_events": len(SUPPORTED_EVENT_TYPES)
+    }
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": "Bentley iTwin Webhooks Dashboard MVP",
+        "version": "1.1",
+        "status": "running",
+        "endpoints": ["/", "/health", "/webhook", "/events", "/dashboard", "/dashboard/feed"],
         "supported_events": len(SUPPORTED_EVENT_TYPES)
     }
 
@@ -106,7 +117,7 @@ async def info():
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy",
+        "status": "ok",
         "time": datetime.utcnow().isoformat() + "Z",
         "events_count": len(events_store)
     }
@@ -758,7 +769,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     return HTMLResponse(content=DASHBOARD_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
@@ -770,4 +781,5 @@ async def favicon():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 3000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
