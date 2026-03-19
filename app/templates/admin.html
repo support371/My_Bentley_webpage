@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block title %}Admin Settings — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Admin Settings</h1>
+    <p class="page-subtitle">Bentley integration, webhooks, and platform configuration</p>
+  </div>
+</div>
+
+<div class="admin-grid">
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Bentley Connection</h2>
+        <span class="badge {% if bentley_configured %}badge-green{% else %}badge-orange{% endif %}">
+          {% if bentley_configured %}Configured{% else %}Not configured{% endif %}
+        </span>
+      </div>
+
+      {% if not bentley_configured %}
+      <div class="alert alert-info">
+        Set <code>BENTLEY_CLIENT_ID</code> and <code>BENTLEY_CLIENT_SECRET</code> in your environment to enable live Bentley API integration.
+      </div>
+      {% endif %}
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Client ID</label>
+          <input type="text" id="bentleyClientId" class="form-input"
+            placeholder="{{ 'Configured via env' if bentley_configured else 'Enter BENTLEY_CLIENT_ID' }}"
+            {% if bentley_configured %}disabled{% endif %} />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Client Secret</label>
+          <input type="password" id="bentleyClientSecret" class="form-input"
+            placeholder="{{ 'Configured via env' if bentley_configured else 'Enter BENTLEY_CLIENT_SECRET' }}"
+            {% if bentley_configured %}disabled{% endif %} />
+        </div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary btn-sm" onclick="testConnection()">Test Connection</button>
+        <button class="btn btn-ghost btn-sm" onclick="fetchITwins()">Fetch iTwins</button>
+        <div id="connectionResult" class="inline-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Webhook Endpoint</h2>
+      </div>
+      <p class="text-muted mb-2">Register this URL in your Bentley webhook subscription:</p>
+      <div class="copy-box">
+        <code id="webhookUrl">{{ request.base_url }}webhook</code>
+        <button class="btn btn-ghost btn-xs" onclick="copyWebhookUrl()">Copy</button>
+      </div>
+      <div class="form-group mt-2">
+        <label class="form-label">Webhook Secret (env: WEBHOOK_SECRET)</label>
+        <input type="text" class="form-input" placeholder="{{ settings.WEBHOOK_SECRET[:4] + '****' if settings.WEBHOOK_SECRET else 'Not set' }}" disabled />
+      </div>
+      <div class="action-row mt-2">
+        <button class="btn btn-primary btn-sm" onclick="listBentleyWebhooks()">List Bentley Webhooks</button>
+        <button class="btn btn-ghost btn-sm" onclick="showCreateWebhookModal()">Register New →</button>
+      </div>
+      <div id="webhooksResult" class="result-panel hidden"></div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Alert Rules</h2>
+        <button class="btn btn-primary btn-sm" onclick="showAlertRuleModal()">+ New Rule</button>
+      </div>
+      <div id="alertRulesList">
+        <div class="text-muted text-sm">Loading rules…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Webhook Deliveries</h2>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table sm">
+          <thead>
+            <tr><th>Time</th><th>IP</th><th>Sig</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for d in recent_deliveries %}
+            <tr>
+              <td class="text-sm text-muted">{{ d.received_at.strftime('%H:%M:%S') }}</td>
+              <td class="text-sm">{{ d.remote_ip or '—' }}</td>
+              <td>
+                {% if d.signature_valid %}
+                <span class="badge badge-green">✓</span>
+                {% else %}
+                <span class="badge badge-red">✗</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {% if d.processing_status == 'processed' %}badge-green{% elif d.processing_status == 'rejected' %}badge-red{% else %}badge-gray{% endif %}">
+                  {{ d.processing_status }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="empty-cell text-muted">No deliveries yet</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Alerts</h2>
+      </div>
+      {% for a in recent_alerts %}
+      <div class="alert-item sev-{{ a.severity }}">
+        <strong>{{ a.title }}</strong>
+        <div class="text-sm text-muted">{{ a.triggered_at.strftime('%Y-%m-%d %H:%M') }}</div>
+      </div>
+      {% else %}
+      <div class="text-muted text-sm">No alerts triggered</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Platform Info</h2>
+      </div>
+      <div class="info-list">
+        <div class="info-row"><span>Version</span><code>{{ settings.APP_VERSION }}</code></div>
+        <div class="info-row"><span>Environment</span><code>{{ settings.ENVIRONMENT }}</code></div>
+        <div class="info-row"><span>Database</span><code>{{ 'SQLite' if 'sqlite' in settings.DATABASE_URL else 'Postgres' }}</code></div>
+        <div class="info-row"><span>Signature verify</span><code>{{ 'disabled' if settings.SKIP_SIGNATURE_VERIFY else 'enabled' }}</code></div>
+        <div class="info-row"><span>JWT expire</span><code>{{ settings.JWT_EXPIRE_MINUTES }} min</code></div>
+      </div>
+      <div class="action-row mt-2">
+        <a href="/api/docs" target="_blank" class="btn btn-ghost btn-sm">API Docs →</a>
+        <a href="/health" target="_blank" class="btn btn-ghost btn-sm">Health Check →</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="alertRuleModal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeAlertModal()"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Create Alert Rule</h3>
+      <button onclick="closeAlertModal()" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Rule Name</label>
+        <input type="text" id="ruleNameInput" class="form-input" placeholder="e.g. iModel deleted alert" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rule Type</label>
+        <select id="ruleTypeInput" class="form-select">
+          <option value="event_type_match">Event Type Match</option>
+          <option value="category_match">Category Match</option>
+          <option value="severity_match">Severity Match</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Match Values (comma-separated)</label>
+        <input type="text" id="ruleValuesInput" class="form-input" placeholder="iModels.iModelDeleted.v1, accessControl.memberRemoved.v1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Slack Webhook URL (optional)</label>
+        <input type="url" id="ruleSlackUrl" class="form-input" placeholder="https://hooks.slack.com/..." />
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary" onclick="createAlertRule()">Create Rule</button>
+        <button class="btn btn-ghost" onclick="closeAlertModal()">Cancel</button>
+        <div id="ruleResult" class="inline-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function testConnection() {
+  const result = document.getElementById('connectionResult');
+  result.textContent = '…testing';
+  const body = {};
+  const cid = document.getElementById('bentleyClientId').value;
+  const csec = document.getElementById('bentleyClientSecret').value;
+  if (cid) body.client_id = cid;
+  if (csec) body.client_secret = csec;
+  try {
+    const res = await fetch('/admin/test-connection', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await res.json();
+    result.textContent = d.connected ? '✓ Connected' : '✗ ' + (d.error || 'Failed');
+    result.className = 'inline-result ' + (d.connected ? 'ok' : 'err');
+  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
+}
+
+async function fetchITwins() {
+  const result = document.getElementById('connectionResult');
+  result.textContent = '…fetching';
+  const body = {};
+  const cid = document.getElementById('bentleyClientId').value;
+  const csec = document.getElementById('bentleyClientSecret').value;
+  if (cid) body.client_id = cid;
+  if (csec) body.client_secret = csec;
+  try {
+    const res = await fetch('/admin/fetch-itwins', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await res.json();
+    if (d.count !== undefined) {
+      result.textContent = `✓ Found ${d.count} iTwins`;
+      result.className = 'inline-result ok';
+    } else {
+      result.textContent = '✗ ' + (d.detail || 'Failed');
+      result.className = 'inline-result err';
+    }
+  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
+}
+
+async function listBentleyWebhooks() {
+  const panel = document.getElementById('webhooksResult');
+  panel.classList.remove('hidden');
+  panel.textContent = 'Loading…';
+  try {
+    const res = await fetch('/admin/webhooks');
+    const d = await res.json();
+    if (d.webhooks) {
+      panel.innerHTML = d.webhooks.length === 0
+        ? '<em>No webhooks registered yet</em>'
+        : '<ul>' + d.webhooks.map(w => `<li><code>${w.id}</code> — ${w.callbackUrl || ''} (${w.isActive ? 'active' : 'inactive'})</li>`).join('') + '</ul>';
+    } else {
+      panel.textContent = 'Error: ' + (d.detail || 'Unknown error');
+    }
+  } catch(e) { panel.textContent = 'Request failed: ' + e.message; }
+}
+
+function copyWebhookUrl() {
+  const url = document.getElementById('webhookUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => alert('Copied: ' + url));
+}
+
+function showAlertRuleModal() { document.getElementById('alertRuleModal').classList.remove('hidden'); }
+function closeAlertModal() { document.getElementById('alertRuleModal').classList.add('hidden'); }
+function showCreateWebhookModal() { alert('Register webhook via POST /admin/webhooks/create — see API docs at /api/docs'); }
+
+async function createAlertRule() {
+  const name = document.getElementById('ruleNameInput').value;
+  const type = document.getElementById('ruleTypeInput').value;
+  const vals = document.getElementById('ruleValuesInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const slackUrl = document.getElementById('ruleSlackUrl').value;
+  const result = document.getElementById('ruleResult');
+
+  const keyMap = {event_type_match: 'event_types', category_match: 'categories', severity_match: 'severities'};
+  const body = {
+    name, rule_type: type,
+    conditions: {[keyMap[type]]: vals},
+    destinations: slackUrl ? [{type:'slack', url:slackUrl}] : []
+  };
+
+  try {
+    const res = await fetch('/admin/alert-rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await res.json();
+    result.textContent = '✓ Created: ' + d.name;
+    result.className = 'inline-result ok';
+    loadAlertRules();
+    setTimeout(closeAlertModal, 1500);
+  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
+}
+
+async function loadAlertRules() {
+  const el = document.getElementById('alertRulesList');
+  const res = await fetch('/admin/alert-rules');
+  const d = await res.json();
+  if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules yet</div>'; return; }
+  el.innerHTML = d.rules.map(r => `
+    <div class="alert-rule-item">
+      <div>
+        <strong>${r.name}</strong>
+        <span class="badge badge-gray">${r.rule_type}</span>
+      </div>
+      <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Muted'}</span>
+    </div>
+  `).join('');
+}
+
+loadAlertRules();
+</script>
+{% endblock %}

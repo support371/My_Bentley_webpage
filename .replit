@@ -16,15 +16,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Node iTwin Dashboard"
+args = "iTwin Ops Center"
 
 [[workflows.workflow]]
-name = "Node iTwin Dashboard"
+name = "iTwin Ops Center"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node index.js"
+args = "uvicorn app.main:app --host 0.0.0.0 --port 5000"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
