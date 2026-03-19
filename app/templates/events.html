@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Event Stream — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Event Stream</h1>
+    <p class="page-subtitle">All incoming Bentley iTwin webhook events</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-primary btn-sm" onclick="loadEvents()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="card filter-bar">
+  <div class="filter-row">
+    <div class="filter-group">
+      <label class="filter-label">Event Type</label>
+      <input type="text" id="filterType" class="form-input sm" placeholder="e.g. iModels.iModelCreated.v1" />
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Category</label>
+      <select id="filterCategory" class="form-select sm">
+        <option value="">All</option>
+        <option>iModels</option>
+        <option>iTwins</option>
+        <option>Access Control</option>
+        <option>Forms</option>
+        <option>Issues</option>
+        <option>Synchronization</option>
+        <option>Transformations</option>
+        <option>Reality</option>
+        <option>Changed Elements</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">iTwin ID</label>
+      <input type="text" id="filterITwin" class="form-input sm" placeholder="Filter by iTwin ID" />
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="loadEvents()">Apply</button>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Events <span class="badge" id="eventCount">—</span></h2>
+    <div class="pagination-controls">
+      <button class="btn btn-ghost btn-sm" id="prevBtn" onclick="changePage(-1)">← Prev</button>
+      <span id="pageInfo" class="text-muted text-sm">Page 1</span>
+      <button class="btn btn-ghost btn-sm" id="nextBtn" onclick="changePage(1)">Next →</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Event Type</th>
+          <th>Category</th>
+          <th>iTwin</th>
+          <th>iModel</th>
+          <th>Severity</th>
+          <th>Received</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="eventsBody">
+        <tr><td colspan="7" class="empty-cell">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="eventModal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitle">Event Detail</h3>
+      <button onclick="closeModal()" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <pre id="modalBody" class="code-block"></pre>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let page = 1;
+let totalPages = 1;
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+async function loadEvents() {
+  const type = document.getElementById('filterType').value;
+  const cat = document.getElementById('filterCategory').value;
+  const itwin = document.getElementById('filterITwin').value;
+  let url = `/events?page=${page}&page_size=50`;
+  if (type) url += `&event_type=${encodeURIComponent(type)}`;
+  if (cat) url += `&category=${encodeURIComponent(cat)}`;
+  if (itwin) url += `&itwin_id=${encodeURIComponent(itwin)}`;
+
+  const body = document.getElementById('eventsBody');
+  body.innerHTML = '<tr><td colspan="7" class="empty-cell">Loading…</td></tr>';
+
+  const res = await fetch(url);
+  const d = await res.json();
+  const events = d.events;
+  totalPages = Math.ceil(d.total / d.page_size) || 1;
+  document.getElementById('eventCount').textContent = d.total;
+  document.getElementById('pageInfo').textContent = `Page ${d.page} of ${totalPages}`;
+  document.getElementById('prevBtn').disabled = d.page <= 1;
+  document.getElementById('nextBtn').disabled = d.page >= totalPages;
+
+  if (!events.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events found</div></div></td></tr>';
+    return;
+  }
+  body.innerHTML = events.map(e => {
+    const dt = new Date(e.received_at);
+    const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const sev = e.severity || 'info';
+    return `<tr>
+      <td><code class="event-tag">${esc(e.event_type)}</code></td>
+      <td><span class="cat-badge cat-${slugify(e.event_category)}">${esc(e.event_category)}</span></td>
+      <td class="text-muted">${esc(e.itwin_name || e.itwin_id || '—')}</td>
+      <td class="text-muted">${esc(e.imodel_name || e.imodel_id || '—')}</td>
+      <td><span class="sev-badge sev-${sev}">${sev}</span></td>
+      <td class="text-muted text-sm">${ts}</td>
+      <td><button class="btn btn-ghost btn-xs" onclick="viewEvent('${esc(e.id)}')">Detail</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function changePage(dir) {
+  page = Math.max(1, Math.min(totalPages, page + dir));
+  loadEvents();
+}
+
+function clearFilters() {
+  document.getElementById('filterType').value = '';
+  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterITwin').value = '';
+  page = 1;
+  loadEvents();
+}
+
+async function viewEvent(id) {
+  const res = await fetch('/events/' + id);
+  const d = await res.json();
+  document.getElementById('modalTitle').textContent = d.event_type;
+  document.getElementById('modalBody').textContent = JSON.stringify(d, null, 2);
+  document.getElementById('eventModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('eventModal').classList.add('hidden');
+}
+
+loadEvents();
+</script>
+{% endblock %}

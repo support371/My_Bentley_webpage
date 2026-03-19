@@ -1,0 +1,427 @@
+You are working inside an existing Replit project that is currently a Bentley iTwin webhook dashboard MVP built with FastAPI. Your job is to transform it into a production-capable Bentley iTwin Operations Center.
+
+Mission
+Refactor and expand this repo into a secure, modular, mobile-first Bentley iTwin event intelligence platform that can:
+1. receive Bentley webhook events,
+2. persist them,
+3. correlate them by tenant / iTwin / iModel,
+4. enrich them with Bentley API data,
+5. visualize them in a responsive dashboard,
+6. trigger alerts and automations,
+7. expose admin tooling for Bentley configuration,
+8. support pilot-grade customer use.
+
+Do not stop at a cosmetic dashboard refresh. Complete the full platform.
+
+Product outcome
+Build a platform that turns Bentley iTwin activity into operational visibility, governance, and automation.
+
+Non-negotiable requirements
+- Keep FastAPI as the backend framework.
+- Preserve backward compatibility for existing core routes where practical:
+  - /
+  - /health
+  - /webhook
+  - /events
+  - /dashboard
+  - /dashboard/feed
+- Replace in-memory event storage with a persistent database.
+- Make the UI mobile-first and responsive. The current mobile experience is not product-grade.
+- Enforce proper security in production mode.
+- Modularize the entire codebase.
+- Add real tests.
+- Add Bentley integration settings and webhook administration.
+- Add docs for local dev, Replit dev, and deployment.
+
+Build scope
+
+1) Refactor architecture
+Split the app into clear modules:
+- app/main.py
+- app/api/routes/
+- app/core/config.py
+- app/core/security.py
+- app/core/logging.py
+- app/db/
+- app/models/
+- app/schemas/
+- app/services/
+- app/services/bentley/
+- app/services/alerts/
+- app/services/reports/
+- app/templates/
+- app/static/
+- tests/
+
+Use environment-based config. Stop scattering config across files.
+
+2) Database and persistence
+Implement SQLAlchemy or SQLModel with Alembic migrations.
+Preferred database:
+- Postgres in production
+- SQLite fallback for local/dev if needed
+
+Create tables for:
+- tenants
+- users
+- roles
+- bentley_connections
+- webhooks
+- webhook_deliveries
+- events
+- event_types
+- event_raw_payloads
+- itwins
+- imodels
+- forms
+- issues
+- repositories
+- sync_jobs
+- transformation_jobs
+- changed_elements_jobs
+- alerts
+- alert_rules
+- notifications
+- audit_logs
+- dashboard_saved_views
+- api_tokens
+
+Store:
+- raw payload
+- normalized payload
+- correlation ids
+- webhook id
+- message id
+- tenant id
+- iTwin id
+- iModel id
+- event type
+- received timestamp
+- enqueue timestamp
+- processing status
+- processing errors
+
+3) Bentley integration layer
+Create a Bentley service adapter layer, not hard-coded route logic.
+
+Support these Bentley capability buckets:
+- Webhooks subscription management
+- iTwins discovery
+- iTwin repository discovery
+- iModels enrichment
+- Access Control event enrichment
+- Forms enrichment
+- Issues enrichment via adapter layer
+- Synchronization job visibility
+- Transformations visibility
+- Reality Management visibility
+- Changed Elements job workflow and comparison status
+
+Important implementation rules:
+- Use official Bentley APIs only.
+- Keep Issues integration behind a dedicated adapter because the Issues surface is not where I want platform coupling risk.
+- Build repository discovery generically so the app can render whichever repository classes exist on a given iTwin instead of assuming only one type of Bentley data.
+- Design for pagination, retry, backoff, and partial Bentley API failure.
+- Normalize all Bentley event types to internal categories:
+  - iTwins
+  - iModels
+  - Access Control
+  - Forms
+  - Issues
+  - Synchronization
+  - Transformations
+  - Reality
+  - Changed Elements
+  - Other
+
+4) Webhook ingestion
+Upgrade /webhook into a proper ingestion pipeline.
+Requirements:
+- Verify signature in production mode
+- Reject invalid signatures
+- Support dev mode override through config only
+- Validate payload shape
+- Capture raw request body
+- Capture headers
+- Deduplicate on Bentley message id when present
+- Process asynchronously using background tasks or a queue abstraction
+- Return safe status payloads
+- Log all failures to webhook_deliveries and audit_logs
+
+Also build:
+- webhook replay tool
+- dead-letter handling for failed processing
+- retry endpoint for admins
+
+5) Admin settings and Bentley onboarding
+Create an admin area with:
+- Bentley client credentials config
+- Bentley service app config
+- webhook callback URL display
+- webhook secret management
+- webhook registration wizard
+- per-tenant Bentley connection settings
+- test connection button
+- fetch iTwins button
+- fetch repositories button
+- webhook subscription management UI
+- status page for Bentley connectivity
+
+Admin pages should let me:
+- connect a Bentley service application
+- register webhooks for selected iTwins
+- choose event categories to subscribe to
+- rotate webhook secret
+- inspect webhook delivery failures
+- force resync Bentley metadata
+
+6) Dashboard and product UI
+Replace the current single embedded HTML string with a proper frontend structure using templates plus static assets.
+Do not leave the entire dashboard in one Python string.
+
+UI requirements:
+- mobile-first
+- dark/light capable
+- tablet and desktop responsive
+- accessible typography and spacing
+- professional admin SaaS look, not a hackathon demo
+
+Main screens:
+- Login
+- Tenant switcher
+- Executive Overview
+- Event Stream
+- iTwin Detail
+- iModel Detail
+- Repository Explorer
+- Forms / Issues activity
+- Access Control activity
+- Jobs and Automations
+- Alerts Center
+- Reports
+- Admin / Settings
+
+Dashboard widgets:
+- total events
+- active iTwins
+- active iModels
+- event type distribution
+- event trend chart
+- recent failures
+- webhook health
+- Bentley connection health
+- access changes
+- forms / issues counts
+- sync / transformation / changed-elements job status
+- repository inventory by class
+- dormant project detection
+- top active projects
+
+Filtering:
+- tenant
+- iTwin
+- iModel
+- event category
+- event type
+- date range
+- severity
+- webhook
+- delivery status
+
+7) Repository intelligence
+Build repository discovery into the product.
+For each iTwin:
+- fetch and store repository metadata
+- show repository class, display name, URI, capabilities if returned
+- render a repository inventory view
+- support refresh / sync
+- show data availability summary
+
+Do not assume every iTwin has the same repository types.
+Make the UI dynamic based on discovered repositories.
+
+8) Event enrichment and correlation
+For incoming events:
+- correlate related iTwin and iModel records
+- enrich names and metadata when missing
+- classify event criticality
+- derive business labels
+- compute project activity scores
+- mark anomalies:
+  - unusual spike
+  - inactivity
+  - repeated access changes
+  - repeated issue creation
+  - sync backlog or job noise
+
+Implement a simple rules-based intelligence layer now.
+Structure it so a future ML/AI scoring module can be swapped in later.
+
+9) Alerts and automation
+Build an alerting engine with rules and destinations.
+
+Rules should support:
+- event type match
+- event category match
+- count threshold
+- inactivity threshold
+- Bentley job completion or failure
+- access control change triggers
+- form / issue creation spikes
+- webhook failure thresholds
+
+Destinations:
+- email
+- Slack webhook
+- Teams webhook
+- generic outbound webhook
+
+Add:
+- alert history
+- mute / unmute
+- per-tenant alert rules
+- test alert button
+
+10) Reporting and exports
+Add reports for:
+- daily summary
+- weekly summary
+- monthly summary
+- per-iTwin activity
+- per-iModel activity
+- access change report
+- issue / form report
+- webhook health report
+- repository inventory report
+
+Exports:
+- CSV
+- JSON
+- PDF summary
+
+11) Security
+Implement:
+- auth for dashboard and admin routes
+- RBAC
+- tenant isolation
+- secure secret storage through environment variables
+- CSRF protection where applicable
+- request validation
+- rate limiting
+- audit logs
+- no default insecure secrets in production
+
+Roles:
+- super_admin
+- tenant_admin
+- operator
+- viewer
+
+12) API layer
+Provide a clean API for frontend and external integrations:
+- /api/auth/*
+- /api/tenants/*
+- /api/events/*
+- /api/itwins/*
+- /api/imodels/*
+- /api/repositories/*
+- /api/forms/*
+- /api/issues/*
+- /api/jobs/*
+- /api/alerts/*
+- /api/reports/*
+- /api/admin/bentley/*
+- /api/admin/webhooks/*
+
+Support pagination, filtering, sorting, and stable response schemas.
+
+13) Replit readiness
+Make the project run cleanly on Replit.
+Tasks:
+- fix any port mismatch
+- use a single source of truth for host/port/base URL
+- update .replit
+- add a startup health check
+- ensure migrations run on startup only when configured
+- document required secrets in Replit Secrets
+
+14) Tests
+Add:
+- unit tests for parsing and normalization
+- webhook signature tests
+- API route tests
+- Bentley adapter tests with mocks
+- alert rule tests
+- repository sync tests
+- regression tests for current routes
+- smoke test script updated to the final architecture
+
+15) Documentation
+Create:
+- README.md refresh
+- ARCHITECTURE.md
+- DEPLOYMENT.md
+- BENTLEY_INTEGRATION.md
+- ADMIN_GUIDE.md
+- API_REFERENCE.md
+- TESTING.md
+
+README must include:
+- what the platform does
+- architecture summary
+- local setup
+- Replit setup
+- environment variables
+- database setup
+- migrations
+- test commands
+- how Bentley onboarding works
+
+Implementation notes
+- Preserve compatibility with the current project purpose, but upgrade it massively.
+- Make the code clean, typed, and maintainable.
+- Prefer pragmatic production patterns over overengineering.
+- Avoid fake AI branding. If insights are rules-based, label them clearly as insights or health scoring.
+- Keep the UI polished on mobile.
+- Do not ship a dashboard that only shows zeros without an onboarding path and empty-state guidance.
+
+Acceptance criteria
+The task is complete only when all of these are true:
+1. Existing MVP routes still work or cleanly redirect to upgraded equivalents.
+2. Events persist across restarts.
+3. Bentley webhook ingestion is secured in production mode.
+4. I can connect Bentley credentials in admin settings.
+5. I can register and manage webhook subscriptions from the app.
+6. I can view iTwins, iModels, repositories, and event history by tenant.
+7. I can view enriched dashboards on mobile and desktop.
+8. I can create alert rules and send test alerts.
+9. I can export reports.
+10. The app includes tests, migrations, and documentation.
+11. The platform is deployable on Replit without manual hacks.
+
+Execution order
+Do the work in this order:
+1. audit the existing repo
+2. fix config and project structure
+3. add database and migrations
+4. refactor webhook ingestion
+5. add Bentley adapter layer
+6. build auth and RBAC
+7. build API layer
+8. build new dashboard and admin UI
+9. build alerts and reports
+10. add tests and docs
+11. update Replit runtime config
+12. verify full end-to-end flow
+
+Output expectations
+When finished:
+- provide a concise changelog
+- list every new file created
+- list all env vars required
+- show the run command
+- show test command
+- show migration command
+- summarize what is complete, what is mocked, and what still needs Bentley credentials to validate live
+
+Start now. Make the repo pilot-ready, not just prettier.

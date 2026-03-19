@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <span class="brand-icon">⬡</span>
+    <span class="brand-name">iTwin Ops</span>
+  </div>
+  <div class="navbar-links">
+    <a href="/dashboard" class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}">
+      <span class="nav-icon">◈</span><span class="nav-label">Overview</span>
+    </a>
+    <a href="/events-view" class="nav-link {% if request.url.path == '/events-view' %}active{% endif %}">
+      <span class="nav-icon">◉</span><span class="nav-label">Events</span>
+    </a>
+    <a href="/itwins-view" class="nav-link {% if request.url.path == '/itwins-view' %}active{% endif %}">
+      <span class="nav-icon">◈</span><span class="nav-label">iTwins</span>
+    </a>
+    <a href="/admin" class="nav-link {% if request.url.path == '/admin' %}active{% endif %}">
+      <span class="nav-icon">⚙</span><span class="nav-label">Admin</span>
+    </a>
+  </div>
+  <div class="navbar-end">
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◑</button>
+    {% if user %}
+      <span class="user-chip">{{ user.email[:20] }}…</span>
+      <a href="/logout" class="btn-sm btn-ghost">Sign out</a>
+    {% else %}
+      <a href="/login" class="btn-sm btn-primary">Sign in</a>
+    {% endif %}
+  </div>
+</nav>
+
+<div class="page-container">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

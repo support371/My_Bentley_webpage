@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Overview — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Operations Overview</h1>
+    <p class="page-subtitle">Live Bentley iTwin event intelligence</p>
+  </div>
+  <div class="page-actions">
+    <div class="time-filter" id="timeFilter">
+      <button class="tf-btn" data-range="1h">1H</button>
+      <button class="tf-btn" data-range="6h">6H</button>
+      <button class="tf-btn active" data-range="24h">24H</button>
+      <button class="tf-btn" data-range="7d">7D</button>
+      <button class="tf-btn" data-range="30d">30D</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="refreshBtn" onclick="refreshDashboard()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid">
+  <div class="kpi-card" data-key="totalEvents">
+    <div class="kpi-icon kpi-blue">◉</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Total Events</div>
+      <div class="kpi-value" id="kpi-total">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" data-key="uniqueITwins">
+    <div class="kpi-icon kpi-purple">◈</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Active iTwins</div>
+      <div class="kpi-value" id="kpi-itwins">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" data-key="uniqueIModels">
+    <div class="kpi-icon kpi-teal">⬡</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Active iModels</div>
+      <div class="kpi-value" id="kpi-imodels">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" data-key="eventTypes">
+    <div class="kpi-icon kpi-orange">◆</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Event Varieties</div>
+      <div class="kpi-value" id="kpi-types">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="main-grid">
+  <div class="main-col">
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">System Health</h2>
+        <div class="health-pill" id="healthPill">
+          <span class="health-dot" id="healthDot"></span>
+          <span id="healthText">Loading…</span>
+        </div>
+      </div>
+      <div class="insights-box" id="insightsBox">
+        Analyzing event stream…
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Recent Event Feed</h2>
+        <a href="/events-view" class="btn btn-ghost btn-sm">View all →</a>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="eventsTable">
+          <thead>
+            <tr>
+              <th>Event Type</th>
+              <th>Category</th>
+              <th>iTwin</th>
+              <th>iModel</th>
+              <th>Severity</th>
+              <th>Received</th>
+            </tr>
+          </thead>
+          <tbody id="eventsBody">
+            <tr><td colspan="6" class="empty-cell">Loading events…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="side-col">
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Event Categories</h2>
+      </div>
+      <div id="categoryBars" class="dist-list">
+        <div class="dist-placeholder">Loading…</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Top Event Types</h2>
+      </div>
+      <div id="typeBars" class="dist-list">
+        <div class="dist-placeholder">Loading…</div>
+      </div>
+    </div>
+
+    <div class="card quick-links-card">
+      <h2 class="card-title">Quick Actions</h2>
+      <div class="quick-links">
+        <a href="/events-view" class="quick-link">
+          <span class="ql-icon">◉</span>
+          <div>
+            <div class="ql-title">Event Stream</div>
+            <div class="ql-sub">Browse all events</div>
+          </div>
+        </a>
+        <a href="/itwins-view" class="quick-link">
+          <span class="ql-icon">◈</span>
+          <div>
+            <div class="ql-title">iTwin Explorer</div>
+            <div class="ql-sub">View active projects</div>
+          </div>
+        </a>
+        <a href="/admin" class="quick-link">
+          <span class="ql-icon">⚙</span>
+          <div>
+            <div class="ql-title">Admin Settings</div>
+            <div class="ql-sub">Configure Bentley integration</div>
+          </div>
+        </a>
+        <a href="/webhook" onclick="seedDemo(event)" class="quick-link">
+          <span class="ql-icon">⚡</span>
+          <div>
+            <div class="ql-title">Send Test Event</div>
+            <div class="ql-sub">Inject a demo webhook</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="page-footer">
+  <span id="lastUpdated">Auto-refreshes every 15s</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentRange = '24h';
+
+async function refreshDashboard() {
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '↻ …';
+  try {
+    const res = await fetch('/dashboard/feed?timeRange=' + currentRange);
+    const d = await res.json();
+    updateKPIs(d.kpis);
+    updateHealth(d.health, d.insights);
+    updateEventsTable(d.recentEvents);
+    updateDist('categoryBars', d.categoryBreakdown, d.kpis.totalEvents);
+    updateDist('typeBars', d.eventTypeBreakdown, d.kpis.totalEvents);
+    document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error(e);
+  }
+  btn.textContent = '↻ Refresh';
+}
+
+function updateKPIs(kpis) {
+  animNum('kpi-total', kpis.totalEvents);
+  animNum('kpi-itwins', kpis.uniqueITwins);
+  animNum('kpi-imodels', kpis.uniqueIModels);
+  animNum('kpi-types', kpis.eventTypes);
+}
+
+function animNum(id, end) {
+  const el = document.getElementById(id);
+  const start = parseInt(el.textContent) || 0;
+  if (start === end) { el.textContent = end; return; }
+  let t = null;
+  const step = ts => {
+    if (!t) t = ts;
+    const p = Math.min((ts - t) / 400, 1);
+    el.textContent = Math.round(start + (end - start) * p);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function updateHealth(health, insights) {
+  const dot = document.getElementById('healthDot');
+  const text = document.getElementById('healthText');
+  const pill = document.getElementById('healthPill');
+  dot.className = 'health-dot health-' + health;
+  text.textContent = health.charAt(0).toUpperCase() + health.slice(1);
+  pill.className = 'health-pill health-pill-' + health;
+  document.getElementById('insightsBox').textContent = insights;
+}
+
+function updateEventsTable(events) {
+  const body = document.getElementById('eventsBody');
+  if (!events || events.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events yet</div><div class="empty-sub">Send a POST to /webhook to get started</div></div></td></tr>';
+    return;
+  }
+  body.innerHTML = events.map(e => {
+    const d = new Date(e.received_at);
+    const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const sev = e.severity || 'info';
+    return `<tr>
+      <td><code class="event-tag">${esc(e.event_type)}</code></td>
+      <td><span class="cat-badge cat-${slugify(e.event_category)}">${esc(e.event_category)}</span></td>
+      <td class="text-muted">${esc(e.itwin_name || e.itwin_id || '—')}</td>
+      <td class="text-muted">${esc(e.imodel_name || e.imodel_id || '—')}</td>
+      <td><span class="sev-badge sev-${sev}">${sev}</span></td>
+      <td class="text-muted text-sm">${time}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateDist(containerId, data, total) {
+  const el = document.getElementById(containerId);
+  if (!data || Object.keys(data).length === 0) {
+    el.innerHTML = '<div class="dist-placeholder">No data</div>';
+    return;
+  }
+  const sorted = Object.entries(data).sort((a,b) => b[1]-a[1]).slice(0,6);
+  const max = sorted[0][1];
+  el.innerHTML = sorted.map(([k, v]) => {
+    const pct = Math.round((v / (total||1)) * 100);
+    const w = Math.round((v / max) * 100);
+    return `<div class="dist-row">
+      <div class="dist-label" title="${esc(k)}">${esc(k.split('.').slice(-2).join('.'))}</div>
+      <div class="dist-bar-wrap"><div class="dist-bar" style="width:${w}%"></div></div>
+      <div class="dist-count">${v} <span class="text-muted">(${pct}%)</span></div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g, '-'); }
+
+async function seedDemo(e) {
+  e.preventDefault();
+  await fetch('/webhook', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      eventType: 'iModels.iModelCreated.v1',
+      content: {
+        iTwinId: 'demo-itwin-001',
+        iModelId: 'demo-imodel-' + Math.random().toString(36).slice(2,7),
+        iTwinName: 'Demo Project',
+        iModelName: 'Test Model'
+      }
+    })
+  });
+  setTimeout(refreshDashboard, 300);
+}
+
+document.querySelectorAll('.tf-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentRange = btn.dataset.range;
+    refreshDashboard();
+  });
+});
+
+refreshDashboard();
+setInterval(refreshDashboard, 15000);
+</script>
+{% endblock %}

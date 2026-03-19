@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}iTwin Explorer — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">iTwin Explorer</h1>
+    <p class="page-subtitle">Projects and digital twins with recent activity</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin" class="btn btn-primary btn-sm">⚙ Sync from Bentley</a>
+  </div>
+</div>
+
+{% if itwins %}
+<div class="resource-grid">
+  {% for tw in itwins %}
+  <div class="resource-card">
+    <div class="resource-card-header">
+      <span class="resource-icon">◈</span>
+      <div class="resource-card-title">{{ tw.display_name or ('iTwin-' + tw.id[:8]) }}</div>
+    </div>
+    <div class="resource-meta">
+      <div class="meta-row">
+        <span class="meta-label">ID</span>
+        <code class="meta-val text-sm">{{ tw.id[:12] }}…</code>
+      </div>
+      {% if tw.type %}
+      <div class="meta-row">
+        <span class="meta-label">Type</span>
+        <span class="meta-val">{{ tw.type }}</span>
+      </div>
+      {% endif %}
+      {% if tw.last_event_at %}
+      <div class="meta-row">
+        <span class="meta-label">Last Activity</span>
+        <span class="meta-val text-sm">{{ tw.last_event_at.strftime('%Y-%m-%d %H:%M') }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <div class="resource-card-footer">
+      <a href="/events-view?itwin={{ tw.id }}" class="btn btn-ghost btn-xs">View Events</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state large">
+    <div class="empty-icon">◈</div>
+    <h3>No iTwins discovered yet</h3>
+    <p>iTwins appear here automatically as webhook events arrive, or you can sync from Bentley in Admin Settings.</p>
+    <a href="/admin" class="btn btn-primary">Go to Admin Settings →</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
