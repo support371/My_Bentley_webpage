@@ -7,6 +7,10 @@ app.use(express.json());
 let events = [];
 
 app.get('/', (req, res) => {
+    res.redirect('/dashboard');
+});
+
+app.get('/api/info', (req, res) => {
     res.json({
         service: "Bentley iTwin Webhooks Dashboard MVP",
         version: "1.0",
