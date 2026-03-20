@@ -101,7 +101,7 @@
       </div>
       <div class="form-group mt-2">
         <label class="form-label">Webhook Secret (env: WEBHOOK_SECRET)</label>
-        <input type="text" class="form-input" placeholder="{{ settings.WEBHOOK_SECRET[:4] + '****' if settings.WEBHOOK_SECRET else 'Not set' }}" disabled />
+        <input type="text" class="form-input" placeholder="{{ 'Configured' if platform_info.WEBHOOK_SECRET_SET else 'Not set' }}" disabled />
       </div>
       <div class="action-row mt-2">
         <button class="btn btn-primary btn-sm" onclick="listBentleyWebhooks()">List Bentley Webhooks</button>
@@ -218,11 +218,11 @@
         <h2 class="card-title">Platform Info</h2>
       </div>
       <div class="info-list">
-        <div class="info-row"><span>Version</span><code>{{ settings.APP_VERSION }}</code></div>
-        <div class="info-row"><span>Environment</span><code>{{ settings.ENVIRONMENT }}</code></div>
-        <div class="info-row"><span>Database</span><code>{{ 'SQLite' if 'sqlite' in settings.DATABASE_URL else 'PostgreSQL' }}</code></div>
-        <div class="info-row"><span>Signature verify</span><code>{{ 'disabled' if settings.SKIP_SIGNATURE_VERIFY else 'enabled' }}</code></div>
-        <div class="info-row"><span>JWT expire</span><code>{{ settings.JWT_EXPIRE_MINUTES }} min</code></div>
+        <div class="info-row"><span>Version</span><code>{{ platform_info.APP_VERSION }}</code></div>
+        <div class="info-row"><span>Environment</span><code>{{ platform_info.ENVIRONMENT }}</code></div>
+        <div class="info-row"><span>Database</span><code>{{ 'SQLite' if platform_info.DATABASE_URL == 'sqlite' else 'PostgreSQL' }}</code></div>
+        <div class="info-row"><span>Signature verify</span><code>{{ 'disabled' if platform_info.SKIP_SIGNATURE_VERIFY else 'enabled' }}</code></div>
+        <div class="info-row"><span>JWT expire</span><code>{{ platform_info.JWT_EXPIRE_MINUTES }} min</code></div>
       </div>
       <div class="action-row mt-2">
         <a href="/api/docs" target="_blank" class="btn btn-ghost btn-sm">API Docs →</a>

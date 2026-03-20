@@ -39,7 +39,14 @@ async def admin_dashboard(request: Request, user: dict = Depends(require_admin),
         "recent_deliveries": recent_deliveries,
         "recent_alerts": recent_alerts,
         "bentley_configured": bool(settings.BENTLEY_CLIENT_ID),
-        "settings": settings,
+        "platform_info": {
+            "APP_VERSION": settings.APP_VERSION,
+            "ENVIRONMENT": settings.ENVIRONMENT,
+            "DATABASE_URL": "sqlite" if "sqlite" in settings.DATABASE_URL else "postgresql",
+            "SKIP_SIGNATURE_VERIFY": settings.SKIP_SIGNATURE_VERIFY,
+            "JWT_EXPIRE_MINUTES": settings.JWT_EXPIRE_MINUTES,
+            "WEBHOOK_SECRET_SET": bool(settings.WEBHOOK_SECRET),
+        },
     })
 
 

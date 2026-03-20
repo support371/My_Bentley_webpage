@@ -40,10 +40,12 @@ app = FastAPI(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+_cors_origins = [settings.PUBLIC_BASE_URL] if settings.PUBLIC_BASE_URL else []
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins or ["*"],
+    allow_credentials=bool(_cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )
