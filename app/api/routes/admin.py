@@ -8,7 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import select
 
 from app.db.database import get_session
-from app.core.security import get_optional_user
+from app.core.security import get_optional_user, require_admin
 from app.models.tenants import Tenant
 from app.models.resources import AlertRule, Alert
 from app.models.events import WebhookDelivery
@@ -20,8 +20,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/admin", response_class=HTMLResponse, tags=["Admin"])
-async def admin_dashboard(request: Request, session: AsyncSession = Depends(get_session)):
-    user = get_optional_user(request)
+async def admin_dashboard(request: Request, user: dict = Depends(require_admin), session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(Tenant).limit(10))
     tenants = result.scalars().all()
     delivery_result = await session.execute(
@@ -45,7 +44,7 @@ async def admin_dashboard(request: Request, session: AsyncSession = Depends(get_
 
 
 @router.post("/admin/test-connection", tags=["Admin"])
-async def api_test_connection(request: Request):
+async def api_test_connection(request: Request, user: dict = Depends(require_admin)):
     body = await request.json()
     result = await test_connection(
         client_id=body.get("client_id") or settings.BENTLEY_CLIENT_ID,
@@ -55,7 +54,7 @@ async def api_test_connection(request: Request):
 
 
 @router.post("/admin/fetch-itwins", tags=["Admin"])
-async def api_fetch_itwins(request: Request, session: AsyncSession = Depends(get_session)):
+async def api_fetch_itwins(request: Request, user: dict = Depends(require_admin), session: AsyncSession = Depends(get_session)):
     body = await request.json()
     cid = body.get("client_id") or settings.BENTLEY_CLIENT_ID
     csec = body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET
@@ -67,7 +66,7 @@ async def api_fetch_itwins(request: Request, session: AsyncSession = Depends(get
 
 
 @router.get("/admin/webhooks", tags=["Admin"])
-async def api_list_webhooks():
+async def api_list_webhooks(request: Request, user: dict = Depends(require_admin)):
     token = await get_access_token()
     if not token:
         raise HTTPException(status_code=400, detail="Bentley not configured")
@@ -76,7 +75,7 @@ async def api_list_webhooks():
 
 
 @router.post("/admin/webhooks/create", tags=["Admin"])
-async def api_create_webhook(request: Request):
+async def api_create_webhook(request: Request, user: dict = Depends(require_admin)):
     body = await request.json()
     token = await get_access_token()
     if not token:
@@ -92,7 +91,7 @@ async def api_create_webhook(request: Request):
 
 
 @router.get("/admin/alert-rules", tags=["Admin"])
-async def list_alert_rules(session: AsyncSession = Depends(get_session)):
+async def list_alert_rules(request: Request, user: dict = Depends(require_admin), session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(AlertRule))
     rules = result.scalars().all()
     return {"rules": [
@@ -105,7 +104,7 @@ async def list_alert_rules(session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/admin/alert-rules", tags=["Admin"])
-async def create_alert_rule(request: Request, session: AsyncSession = Depends(get_session)):
+async def create_alert_rule(request: Request, user: dict = Depends(require_admin), session: AsyncSession = Depends(get_session)):
     body = await request.json()
     rule = AlertRule(
         name=body["name"],

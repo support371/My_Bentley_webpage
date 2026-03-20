@@ -5,7 +5,7 @@ import random
 import string
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import select, func, delete
@@ -13,6 +13,7 @@ from sqlalchemy import select, func, delete
 from app.db.database import get_session
 from app.models.events import Event
 from app.schemas.events import EventOut, EventsResponse
+from app.core.security import require_auth
 
 router = APIRouter()
 
@@ -137,6 +138,8 @@ async def export_events_csv(
 
 @router.post("/api/events/demo", tags=["Events"])
 async def seed_demo_events(
+    request: Request,
+    user: dict = Depends(require_auth),
     count: int = Query(default=5, ge=1, le=50),
     session: AsyncSession = Depends(get_session),
 ):
@@ -174,6 +177,8 @@ async def seed_demo_events(
 
 @router.delete("/api/events/old", tags=["Events"])
 async def delete_old_events(
+    request: Request,
+    user: dict = Depends(require_auth),
     days: int = Query(default=30, ge=1, le=365),
     session: AsyncSession = Depends(get_session),
 ):

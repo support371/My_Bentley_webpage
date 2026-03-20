@@ -8,7 +8,7 @@ class Integration(SQLModel, table=True):
     __tablename__ = "integrations"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    slug: str = Field(index=True)
+    slug: str = Field(unique=True, index=True)
     name: str
     category: str
     description: Optional[str] = None

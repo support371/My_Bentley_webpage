@@ -51,14 +51,25 @@ async def evaluate_event(event: Event, session: AsyncSession):
                 severity=event.severity,
             )
             session.add(alert)
-            destinations = json.loads(rule.destinations or "[]")
+            try:
+                destinations = json.loads(rule.destinations or "[]")
+            except Exception:
+                destinations = []
             matched_alerts.append((alert, destinations))
 
-    if matched_alerts:
-        await session.commit()
-        for alert, destinations in matched_alerts:
-            for dest in destinations:
+    if not matched_alerts:
+        return
+
+    # Single commit for all matched alerts per event
+    await session.commit()
+
+    # Dispatch notifications after commit — failures here don't roll back alerts
+    for alert, destinations in matched_alerts:
+        for dest in destinations:
+            try:
                 await dispatch_alert(dest, alert, event)
+            except Exception as e:
+                logger.warning(f"Alert dispatch failed for {alert.id}: {e}")
 
 
 async def dispatch_alert(dest: dict, alert: Alert, event: Event):

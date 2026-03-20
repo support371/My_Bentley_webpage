@@ -45,6 +45,7 @@ async def login(
         "access_token", token,
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         httponly=True,
+        secure=settings.COOKIE_SECURE,
         samesite="lax",
     )
     return response

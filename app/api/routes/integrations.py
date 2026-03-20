@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.db.database import get_session
 from app.models.integrations import Integration
-from app.core.security import get_optional_user
+from app.core.security import get_optional_user, require_auth
 from app.core.config import settings
 
 router = APIRouter()
@@ -136,7 +136,7 @@ async def list_integrations(session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/api/integrations", tags=["Integrations"])
-async def create_or_update_integration(request: Request, session: AsyncSession = Depends(get_session)):
+async def create_or_update_integration(request: Request, user: dict = Depends(require_auth), session: AsyncSession = Depends(get_session)):
     body = await request.json()
     slug = body.get("slug", "").strip().lower().replace(" ", "-")
     if not slug:
@@ -182,8 +182,28 @@ async def create_or_update_integration(request: Request, session: AsyncSession =
         return {"id": row.id, "slug": row.slug, "status": row.status, "action": "created"}
 
 
+def _is_safe_url(url: str) -> bool:
+    """Reject URLs pointing to private/internal IP ranges to prevent SSRF."""
+    from urllib.parse import urlparse
+    import ipaddress
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False
+    hostname = parsed.hostname or ""
+    if hostname in ("localhost", ""):
+        return False
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return addr.is_global
+    except ValueError:
+        # hostname is a domain name — block obvious internal patterns
+        if hostname.endswith(".local") or hostname.endswith(".internal"):
+            return False
+        return True
+
+
 @router.post("/api/integrations/{slug}/test", tags=["Integrations"])
-async def test_integration(slug: str, session: AsyncSession = Depends(get_session)):
+async def test_integration(slug: str, user: dict = Depends(require_auth), session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(Integration).where(Integration.slug == slug))
     row = result.scalars().first()
     if not row:
@@ -192,13 +212,16 @@ async def test_integration(slug: str, session: AsyncSession = Depends(get_sessio
     success = False
     message = "No credentials to test"
     if row.webhook_url:
-        try:
-            async with httpx.AsyncClient(timeout=8) as client:
-                r = await client.post(row.webhook_url, json={"test": True, "source": "iTwin Ops Center", "slug": slug})
-                success = r.status_code < 400
-                message = f"HTTP {r.status_code}"
-        except Exception as e:
-            message = f"Error: {str(e)[:100]}"
+        if not _is_safe_url(row.webhook_url):
+            message = "Refused: URL points to a private/internal address"
+        else:
+            try:
+                async with httpx.AsyncClient(timeout=8) as client:
+                    r = await client.post(row.webhook_url, json={"test": True, "source": "iTwin Ops Center", "slug": slug})
+                    success = r.status_code < 400
+                    message = f"HTTP {r.status_code}"
+            except Exception as e:
+                message = f"Error: {str(e)[:100]}"
     elif row.api_key:
         success = True
         message = "API key present (not verified)"
@@ -210,7 +233,7 @@ async def test_integration(slug: str, session: AsyncSession = Depends(get_sessio
 
 
 @router.delete("/api/integrations/{slug}", tags=["Integrations"])
-async def disconnect_integration(slug: str, session: AsyncSession = Depends(get_session)):
+async def disconnect_integration(slug: str, user: dict = Depends(require_auth), session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(Integration).where(Integration.slug == slug))
     row = result.scalars().first()
     if not row:

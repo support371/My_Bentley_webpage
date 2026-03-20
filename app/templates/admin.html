@@ -370,7 +370,7 @@ async function createAlertRule() {
     const d = await res.json();
     result.textContent = '✓ Created: ' + d.name;
     result.className = 'inline-result ok';
-    _showToast('Alert rule created: ' + d.name, 'success');
+    _showToast('Alert rule created: ' + _esc(d.name), 'success');
     loadAlertRules();
     setTimeout(closeAlertModal, 1500);
   } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
