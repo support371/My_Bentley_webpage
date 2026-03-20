@@ -1,12 +1,16 @@
 /* ─── RESET & TOKENS ─────────────────────────────────── */
 :root {
   --primary: #3b82f6;
+  --accent: #3b82f6;
   --primary-dark: #1e3a8a;
   --primary-light: #dbeafe;
   --bg: #f8fafc;
   --bg-card: #ffffff;
+  --bg-secondary: #f1f5f9;
   --bg-nav: #0f172a;
   --text: #0f172a;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
   --text-muted: #64748b;
   --border: #e2e8f0;
   --radius: 10px;
@@ -23,11 +27,19 @@
 [data-theme="dark"] {
   --bg: #0f172a;
   --bg-card: #1e293b;
+  --bg-secondary: #0f172a;
   --bg-nav: #020617;
   --text: #f1f5f9;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
   --text-muted: #94a3b8;
   --border: #334155;
   --primary-light: #1e3a8a;
+  --green-bg: #14532d44;
+  --orange-bg: #7c2d1244;
+  --red-bg: #7f1d1d44;
+  --purple-bg: #3b0764aa;
+  --teal-bg: #134e4a44;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,10 +109,12 @@ code { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: .85e
 .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .kpi-icon { font-size: 1.8rem; flex-shrink: 0; width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
-.kpi-blue { background: var(--primary-light); color: var(--primary); }
+.kpi-blue   { background: var(--primary-light); color: var(--primary); }
 .kpi-purple { background: var(--purple-bg); color: var(--purple); }
-.kpi-teal { background: var(--teal-bg); color: var(--teal); }
+.kpi-teal   { background: var(--teal-bg); color: var(--teal); }
 .kpi-orange { background: var(--orange-bg); color: var(--orange); }
+.kpi-green  { background: var(--green-bg); color: var(--green); }
+.kpi-red    { background: var(--red-bg); color: var(--red); }
 .kpi-label { font-size: .8rem; color: var(--text-muted); text-transform: uppercase;
   letter-spacing: .5px; margin-bottom: 2px; }
 .kpi-value { font-size: 2rem; font-weight: 800; line-height: 1; color: var(--text); }
@@ -316,3 +330,42 @@ code { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: .85e
 .text-sm { font-size: .875rem; }
 .hidden { display: none !important; }
 .quick-links-card { padding: 1.25rem; }
+
+/* ─── SKELETON LOADER ────────────────────────────────── */
+.skeleton { background: linear-gradient(90deg, var(--border) 25%, var(--bg-secondary) 50%, var(--border) 75%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 4px; }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.skeleton-text { height: .875rem; margin-bottom: .5rem; }
+.skeleton-title { height: 1.25rem; width: 60%; margin-bottom: .75rem; }
+
+/* ─── SCROLL IMPROVEMENTS ────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── FOCUS RING ─────────────────────────────────────── */
+*:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ─── BADGE GREEN ────────────────────────────────────── */
+.badge-blue { background: var(--primary-light); color: var(--primary); }
+
+/* ─── TRANSITION IMPROVEMENTS ────────────────────────── */
+.card { transition: box-shadow var(--transition); }
+.kpi-card { transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition); }
+.kpi-card:hover { border-color: var(--primary); }
+
+/* ─── RESPONSIVE TABLE ───────────────────────────────── */
+@media(max-width: 640px) {
+  .data-table th:nth-child(4),
+  .data-table td:nth-child(4) { display: none; }
+}
+
+/* ─── CODE HIGHLIGHT ─────────────────────────────────── */
+.code-block { line-height: 1.6; tab-size: 2; }
+
+/* ─── PRINT STYLES ───────────────────────────────────── */
+@media print {
+  .navbar, .page-actions, .filter-bar, .pagination-controls { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
