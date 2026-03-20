@@ -1,7 +1,10 @@
 import os
+import logging
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import Optional
+
+logger = logging.getLogger("itwin_ops.config")
 
 
 class Settings(BaseSettings):
@@ -44,13 +47,21 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 8
 
+    COOKIE_SECURE: bool = Field(default=False, env="COOKIE_SECURE")
+
     WEBHOOK_SECRET: str = Field(default="", env="WEBHOOK_SECRET")
     SKIP_SIGNATURE_VERIFY: bool = Field(default=True, env="SKIP_SIGNATURE_VERIFY")
 
     BENTLEY_CLIENT_ID: Optional[str] = Field(default=None, env="BENTLEY_CLIENT_ID")
     BENTLEY_CLIENT_SECRET: Optional[str] = Field(default=None, env="BENTLEY_CLIENT_SECRET")
-    BENTLEY_AUTHORITY: str = "https://ims.bentley.com"
-    BENTLEY_API_BASE: str = "https://api.bentley.com"
+    BENTLEY_AUTHORITY: str = Field(default="https://ims.bentley.com", env="BENTLEY_AUTHORITY")
+    BENTLEY_API_BASE: str = Field(default="https://api.bentley.com", env="BENTLEY_API_BASE")
+    BENTLEY_SCOPE: str = Field(
+        default="itwins:read imodels:read webhooks:read webhooks:modify",
+        env="BENTLEY_SCOPE",
+    )
+
+    PUBLIC_BASE_URL: Optional[str] = Field(default=None, env="PUBLIC_BASE_URL")
 
     INITIAL_ADMIN_EMAIL: str = Field(default="admin@example.com", env="INITIAL_ADMIN_EMAIL")
     INITIAL_ADMIN_PASSWORD: str = Field(default="admin123", env="INITIAL_ADMIN_PASSWORD")
@@ -67,6 +78,28 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def _emit_production_warnings() -> None:
+    if settings.ENVIRONMENT != "production":
+        return
+    if settings.SKIP_SIGNATURE_VERIFY:
+        logger.warning(
+            "PRODUCTION WARNING: SKIP_SIGNATURE_VERIFY=True — webhook signatures are not checked. "
+            "Set SKIP_SIGNATURE_VERIFY=False and configure WEBHOOK_SECRET immediately."
+        )
+    if not settings.WEBHOOK_SECRET:
+        logger.warning(
+            "PRODUCTION WARNING: WEBHOOK_SECRET is not set — any caller can POST to /webhook."
+        )
+    if not settings.COOKIE_SECURE:
+        logger.warning(
+            "PRODUCTION WARNING: COOKIE_SECURE=False — session cookies are not marked Secure. "
+            "Set COOKIE_SECURE=True for HTTPS deployments."
+        )
+
+
+_emit_production_warnings()
 
 
 def is_production() -> bool:

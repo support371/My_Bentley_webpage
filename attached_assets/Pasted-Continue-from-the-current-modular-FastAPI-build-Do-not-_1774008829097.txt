@@ -1,0 +1,157 @@
+Continue from the current modular FastAPI build. Do not ask for approval. Proceed immediately.
+
+Current observed state from the live admin page:
+- Version 2.0.0
+- Environment development
+- Database PostgreSQL
+- Bentley Connection shows "Not configured"
+- Integrations = 0
+- Test Connection / Fetch iTwins shows Error
+- Webhook Secret is not set
+- Signature verify is disabled
+- Deliveries exist, so the app is partially working
+
+Priority:
+Fix Bentley credential/runtime diagnostics and make the platform prove exactly why Bentley auth is failing.
+
+Implement all of this now:
+
+1. Build Bentley diagnostics service
+Create:
+- app/services/bentley/diagnostics.py
+
+Add functions:
+- check_env_configuration()
+- mask_client_id()
+- test_oauth_token()
+- test_itwins_access()
+- test_webhooks_access()
+- compute_callback_url(request)
+- check_webhook_security_state()
+- summarize_bentley_readiness()
+
+Each diagnostic result must return:
+- ok
+- check_name
+- short_message
+- technical_detail
+- recommended_fix
+- status_code when applicable
+
+Supported error classes:
+- missing_credentials
+- invalid_client
+- invalid_secret
+- token_request_failed
+- insufficient_scope
+- insufficient_itwin_access
+- insufficient_webhook_permissions
+- callback_url_not_ready
+- webhook_secret_missing
+- signature_verification_disabled
+- unknown_error
+
+2. Add admin diagnostics API
+Create these routes:
+- GET /admin/diagnostics
+- GET /api/admin/diagnostics/summary
+- POST /api/admin/diagnostics/test-oauth
+- POST /api/admin/diagnostics/test-itwins
+- POST /api/admin/diagnostics/test-webhooks
+- GET /api/admin/diagnostics/callback-url
+- GET /api/admin/diagnostics/security-state
+
+Requirements:
+- admin-only
+- never return full secret values
+- only show whether secret exists
+- mask client id
+- return exact actionable failure messages
+
+3. Add Replit runtime URL detection
+Support:
+- PUBLIC_BASE_URL
+- REPLIT_DEV_DOMAIN
+- REPLIT_DOMAIN
+- request base URL fallback
+
+Use this to compute the webhook callback URL candidate:
+- preferred: PUBLIC_BASE_URL + /webhook
+- fallback: request.base_url + webhook
+
+4. Upgrade admin page
+Add a "Bentley Diagnostics" section that shows:
+- Bentley configured yes/no
+- Client ID present yes/no
+- Client secret present yes/no
+- Webhook secret present yes/no
+- Signature verify enabled yes/no
+- Callback URL candidate
+- OAuth test result
+- iTwins access result
+- Webhooks access result
+- recommended next actions
+
+Add buttons:
+- Test OAuth
+- Test iTwins
+- Test Webhooks
+- Copy callback URL
+
+5. Fix Bentley client error handling
+Refactor Bentley client code so:
+- token endpoint failures are parsed cleanly
+- timeout vs auth vs permission errors are distinguishable
+- Bentley scope comes from env
+- no secret is logged
+- no secret is persisted
+
+6. Secure config cleanup
+Ensure config supports:
+- PUBLIC_BASE_URL
+- BENTLEY_SCOPE
+- COOKIE_SECURE
+- ENVIRONMENT
+- SKIP_SIGNATURE_VERIFY
+- WEBHOOK_SECRET
+- BENTLEY_CLIENT_ID
+- BENTLEY_CLIENT_SECRET
+
+If ENVIRONMENT == production:
+- warn if SKIP_SIGNATURE_VERIFY is true
+- warn if WEBHOOK_SECRET is missing
+- warn if COOKIE_SECURE is false
+
+7. Add operator guidance
+On the diagnostics page, explicitly show what to request from the client:
+- Bentley Service Application client ID
+- fresh client secret
+- service app identity/email
+- target iTwin IDs
+- confirmation of service app access to those iTwins
+- confirmation of webhook permissions
+
+8. Add safe curl helper examples
+Render copyable commands with placeholders only:
+- token request
+- iTwins test
+- webhooks test
+
+9. Add tests
+Cover:
+- missing credentials
+- masked client id behavior
+- callback URL generation
+- production warnings
+- diagnostics summary
+- admin diagnostics auth protection
+
+10. Update docs
+Document required Replit Secrets and exact diagnostic flow.
+
+Output when finished:
+- concise changelog
+- files changed
+- required Replit Secrets
+- how to test Bentley auth in the UI
+- what success and failure look like
