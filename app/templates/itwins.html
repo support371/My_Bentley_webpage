@@ -1,6 +1,26 @@
 {% extends "base.html" %}
 {% block title %}iTwin Explorer — {{ app_name }}{% endblock %}
 
+{% block head %}
+<style>
+.itwins-toolbar { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;
+  margin-bottom:1.25rem; }
+.itwins-search { flex:1; min-width:200px; max-width:320px; padding:.5rem .9rem;
+  border-radius:8px; border:1px solid var(--border); background:var(--bg-card);
+  color:var(--text-primary); font-size:.875rem; }
+.itwins-search:focus { outline:none; border-color:var(--primary); }
+.event-count-pill { display:inline-block; padding:.1rem .5rem; border-radius:20px;
+  background:var(--primary-light); color:var(--primary); font-size:.7rem; font-weight:700; }
+.itwin-status-dot { width:8px; height:8px; border-radius:50%; display:inline-block;
+  margin-right:.35rem; }
+.itwin-status-dot.active { background:var(--green); animation:pulse 2s infinite; }
+.itwin-status-dot.idle { background:var(--text-muted); }
+.sort-btn { padding:.3rem .7rem; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg-card); cursor:pointer; font-size:.8rem; color:var(--text-muted); }
+.sort-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
@@ -8,50 +28,165 @@
     <p class="page-subtitle">Projects and digital twins with recent activity</p>
   </div>
   <div class="page-actions">
-    <a href="/admin" class="btn btn-primary btn-sm">⚙ Sync from Bentley</a>
+    <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+      <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()"> Live
+    </label>
+    <button class="btn btn-primary btn-sm" onclick="loadITwins()">↻ Refresh</button>
   </div>
 </div>
 
-{% if itwins %}
-<div class="resource-grid">
-  {% for tw in itwins %}
-  <div class="resource-card">
-    <div class="resource-card-header">
-      <span class="resource-icon">◈</span>
-      <div class="resource-card-title">{{ tw.display_name or ('iTwin-' + tw.id[:8]) }}</div>
-    </div>
-    <div class="resource-meta">
-      <div class="meta-row">
-        <span class="meta-label">ID</span>
-        <code class="meta-val text-sm">{{ tw.id[:12] }}…</code>
-      </div>
-      {% if tw.type %}
-      <div class="meta-row">
-        <span class="meta-label">Type</span>
-        <span class="meta-val">{{ tw.type }}</span>
-      </div>
-      {% endif %}
-      {% if tw.last_event_at %}
-      <div class="meta-row">
-        <span class="meta-label">Last Activity</span>
-        <span class="meta-val text-sm">{{ tw.last_event_at.strftime('%Y-%m-%d %H:%M') }}</span>
-      </div>
-      {% endif %}
-    </div>
-    <div class="resource-card-footer">
-      <a href="/events-view?itwin={{ tw.id }}" class="btn btn-ghost btn-xs">View Events</a>
+<div class="itwins-toolbar">
+  <input type="search" class="itwins-search" id="searchInput" placeholder="🔍  Search iTwins…" oninput="filterCards()">
+  <div style="display:flex;gap:.4rem;">
+    <button class="sort-btn active" id="sortRecent" onclick="setSort('recent', this)">Recent</button>
+    <button class="sort-btn" id="sortName" onclick="setSort('name', this)">Name</button>
+  </div>
+  <span class="text-muted text-sm" id="iTwinCount">Loading…</span>
+</div>
+
+<div class="resource-grid" id="iTwinsGrid">
+  <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted)">Loading iTwins…</div>
+</div>
+
+<div id="emptyState" style="display:none;">
+  <div class="card">
+    <div class="empty-state large">
+      <div class="empty-icon">◈</div>
+      <h3>No iTwins discovered yet</h3>
+      <p>iTwins appear here automatically as webhook events arrive.</p>
+      <button class="btn btn-primary" onclick="seedDemo()">Send Demo Events</button>
     </div>
   </div>
-  {% endfor %}
 </div>
-{% else %}
-<div class="card">
-  <div class="empty-state large">
-    <div class="empty-icon">◈</div>
-    <h3>No iTwins discovered yet</h3>
-    <p>iTwins appear here automatically as webhook events arrive, or you can sync from Bentley in Admin Settings.</p>
-    <a href="/admin" class="btn btn-primary">Go to Admin Settings →</a>
-  </div>
-</div>
-{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allITwins = [];
+let sortMode = 'recent';
+let autoInterval = null;
+
+async function loadITwins() {
+  try {
+    const res = await fetch('/api/itwins');
+    const d = await res.json();
+    allITwins = d.itwins || [];
+    renderCards();
+  } catch(e) {
+    document.getElementById('iTwinsGrid').innerHTML =
+      `<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:2rem">Error loading iTwins: ${e.message}</div>`;
+  }
+}
+
+function renderCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let items = allITwins.filter(t => !q ||
+    (t.display_name||'').toLowerCase().includes(q) ||
+    (t.id||'').toLowerCase().includes(q) ||
+    (t.type||'').toLowerCase().includes(q)
+  );
+
+  if (sortMode === 'name') {
+    items.sort((a, b) => (a.display_name||a.id).localeCompare(b.display_name||b.id));
+  }
+
+  document.getElementById('iTwinCount').textContent = `${items.length} iTwin${items.length !== 1 ? 's' : ''}`;
+
+  const grid = document.getElementById('iTwinsGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (allITwins.length === 0) {
+    grid.style.display = 'none'; empty.style.display = 'block'; return;
+  }
+  grid.style.display = ''; empty.style.display = 'none';
+
+  if (!items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted)">No iTwins match your search</div>`;
+    return;
+  }
+
+  const now = Date.now();
+  grid.innerHTML = items.map(tw => {
+    const lastMs = tw.last_event_at ? new Date(tw.last_event_at).getTime() : 0;
+    const isActive = lastMs && (now - lastMs) < 3600000;
+    const lastStr = lastMs ? timeAgo(new Date(tw.last_event_at)) : 'Never';
+    const eventCount = tw.event_count || 0;
+    const imodelCount = tw.imodel_count || 0;
+    return `<div class="resource-card" id="tw-${tw.id}">
+      <div class="resource-card-header">
+        <span class="resource-icon">◈</span>
+        <div class="resource-card-title">${esc(tw.display_name || ('iTwin-' + tw.id.slice(0,8)))}</div>
+      </div>
+      <div class="resource-meta">
+        <div class="meta-row">
+          <span class="meta-label">Status</span>
+          <span class="meta-val">
+            <span class="itwin-status-dot ${isActive ? 'active' : 'idle'}"></span>
+            ${isActive ? 'Active' : 'Idle'}
+          </span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">ID</span>
+          <code class="meta-val text-sm" title="${esc(tw.id)}">${esc(tw.id.slice(0,16))}${tw.id.length > 16 ? '…' : ''}</code>
+        </div>
+        ${tw.type ? `<div class="meta-row"><span class="meta-label">Type</span><span class="meta-val">${esc(tw.type)}</span></div>` : ''}
+        <div class="meta-row">
+          <span class="meta-label">Events</span>
+          <span class="meta-val"><span class="event-count-pill">${eventCount}</span></span>
+        </div>
+        ${imodelCount > 0 ? `<div class="meta-row"><span class="meta-label">iModels</span><span class="meta-val">${imodelCount}</span></div>` : ''}
+        <div class="meta-row">
+          <span class="meta-label">Last Activity</span>
+          <span class="meta-val text-sm">${lastStr}</span>
+        </div>
+      </div>
+      <div class="resource-card-footer" style="display:flex;gap:.4rem;">
+        <a href="/events-view?itwin_id=${encodeURIComponent(tw.id)}" class="btn btn-ghost btn-xs">Events</a>
+        <button onclick="copyId('${esc(tw.id)}')" class="btn btn-ghost btn-xs">Copy ID</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterCards() { renderCards(); }
+
+function setSort(mode, btn) {
+  sortMode = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCards();
+}
+
+function toggleAutoRefresh() {
+  const on = document.getElementById('autoRefreshToggle').checked;
+  if (on) { autoInterval = setInterval(loadITwins, 15000); }
+  else { clearInterval(autoInterval); }
+}
+
+function copyId(id) {
+  navigator.clipboard.writeText(id).then(() => {
+    window._showToast && window._showToast('ID copied to clipboard', 'success');
+  });
+}
+
+async function seedDemo() {
+  const r = await fetch('/api/events/demo?count=5', { method: 'POST' });
+  if (r.ok) { setTimeout(loadITwins, 500); }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
+  return `${Math.floor(secs/86400)}d ago`;
+}
+
+loadITwins();
+</script>
 {% endblock %}

@@ -1,11 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Overview — {{ app_name }}{% endblock %}
 
+{% block head %}
+<style>
+.kpi-grid { grid-template-columns: repeat(5, 1fr) !important; }
+@media(max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; } }
+@media(max-width: 640px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+.kpi-green { background: var(--green-bg); color: var(--green); }
+.kpi-red   { background: var(--red-bg);   color: var(--red); }
+.kpi-trend { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }
+.live-dot  { width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+             animation: pulse 2s infinite; display: inline-block; margin-right: 4px; }
+.event-row-new { animation: rowFlash .8s ease-out; }
+@keyframes rowFlash { from { background: rgba(59,130,246,.15); } to { background: transparent; } }
+.sev-tag { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; }
+.sev-tag-info    { background: #3b82f6; }
+.sev-tag-success { background: var(--green); }
+.sev-tag-warning { background: var(--orange); }
+.sev-tag-error   { background: var(--red); }
+.test-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+  z-index:900; align-items:center; justify-content:center; padding:1rem; }
+.test-modal-overlay.open { display:flex; }
+.test-modal { background:var(--bg-card); border-radius:14px; width:100%; max-width:440px;
+  box-shadow:0 24px 64px rgba(0,0,0,.3); animation:slideUp .2s ease-out; }
+@keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.test-modal-header { display:flex; justify-content:space-between; align-items:center;
+  padding:1.1rem 1.4rem; border-bottom:1px solid var(--border); font-weight:700; }
+.test-modal-body { padding:1.4rem; }
+.test-modal-footer { padding:.9rem 1.4rem; border-top:1px solid var(--border);
+  display:flex; gap:.5rem; justify-content:flex-end; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
     <h1 class="page-title">Operations Overview</h1>
-    <p class="page-subtitle">Live Bentley iTwin event intelligence</p>
+    <p class="page-subtitle">
+      <span class="live-dot"></span>Live Bentley iTwin event intelligence
+    </p>
   </div>
   <div class="page-actions">
     <div class="time-filter" id="timeFilter">
@@ -15,37 +48,45 @@
       <button class="tf-btn" data-range="7d">7D</button>
       <button class="tf-btn" data-range="30d">30D</button>
     </div>
+    <button class="btn btn-primary btn-sm" onclick="openTestModal()">⚡ Test Event</button>
     <button class="btn btn-ghost btn-sm" id="refreshBtn" onclick="refreshDashboard()">↻ Refresh</button>
   </div>
 </div>
 
 <div class="kpi-grid" id="kpiGrid">
-  <div class="kpi-card" data-key="totalEvents">
+  <div class="kpi-card">
     <div class="kpi-icon kpi-blue">◉</div>
     <div class="kpi-body">
       <div class="kpi-label">Total Events</div>
       <div class="kpi-value" id="kpi-total">—</div>
     </div>
   </div>
-  <div class="kpi-card" data-key="uniqueITwins">
+  <div class="kpi-card">
     <div class="kpi-icon kpi-purple">◈</div>
     <div class="kpi-body">
       <div class="kpi-label">Active iTwins</div>
       <div class="kpi-value" id="kpi-itwins">—</div>
     </div>
   </div>
-  <div class="kpi-card" data-key="uniqueIModels">
+  <div class="kpi-card">
     <div class="kpi-icon kpi-teal">⬡</div>
     <div class="kpi-body">
       <div class="kpi-label">Active iModels</div>
       <div class="kpi-value" id="kpi-imodels">—</div>
     </div>
   </div>
-  <div class="kpi-card" data-key="eventTypes">
+  <div class="kpi-card">
     <div class="kpi-icon kpi-orange">◆</div>
     <div class="kpi-body">
-      <div class="kpi-label">Event Varieties</div>
+      <div class="kpi-label">Event Types</div>
       <div class="kpi-value" id="kpi-types">—</div>
+    </div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon kpi-green">🔌</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Integrations</div>
+      <div class="kpi-value" id="kpi-integrations">—</div>
     </div>
   </div>
 </div>
@@ -61,15 +102,18 @@
           <span id="healthText">Loading…</span>
         </div>
       </div>
-      <div class="insights-box" id="insightsBox">
-        Analyzing event stream…
-      </div>
+      <div class="insights-box" id="insightsBox">Analyzing event stream…</div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">Recent Event Feed</h2>
-        <a href="/events-view" class="btn btn-ghost btn-sm">View all →</a>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+            <input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()"> Auto-refresh
+          </label>
+          <a href="/events-view" class="btn btn-ghost btn-sm">View all →</a>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="data-table" id="eventsTable">
@@ -78,13 +122,12 @@
               <th>Event Type</th>
               <th>Category</th>
               <th>iTwin</th>
-              <th>iModel</th>
               <th>Severity</th>
               <th>Received</th>
             </tr>
           </thead>
           <tbody id="eventsBody">
-            <tr><td colspan="6" class="empty-cell">Loading events…</td></tr>
+            <tr><td colspan="5" class="empty-cell">Loading events…</td></tr>
           </tbody>
         </table>
       </div>
@@ -98,50 +141,42 @@
       <div class="card-header">
         <h2 class="card-title">Event Categories</h2>
       </div>
-      <div id="categoryBars" class="dist-list">
-        <div class="dist-placeholder">Loading…</div>
-      </div>
+      <div id="categoryBars" class="dist-list"><div class="dist-placeholder">Loading…</div></div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">Top Event Types</h2>
       </div>
-      <div id="typeBars" class="dist-list">
-        <div class="dist-placeholder">Loading…</div>
-      </div>
+      <div id="typeBars" class="dist-list"><div class="dist-placeholder">Loading…</div></div>
     </div>
 
     <div class="card quick-links-card">
-      <h2 class="card-title">Quick Actions</h2>
+      <h2 class="card-title" style="margin-bottom:.85rem;">Quick Actions</h2>
       <div class="quick-links">
         <a href="/events-view" class="quick-link">
           <span class="ql-icon">◉</span>
-          <div>
-            <div class="ql-title">Event Stream</div>
-            <div class="ql-sub">Browse all events</div>
-          </div>
+          <div><div class="ql-title">Event Stream</div><div class="ql-sub">Browse all events</div></div>
         </a>
         <a href="/itwins-view" class="quick-link">
           <span class="ql-icon">◈</span>
-          <div>
-            <div class="ql-title">iTwin Explorer</div>
-            <div class="ql-sub">View active projects</div>
-          </div>
+          <div><div class="ql-title">iTwin Explorer</div><div class="ql-sub">View active projects</div></div>
+        </a>
+        <a href="/integrations" class="quick-link">
+          <span class="ql-icon">🔌</span>
+          <div><div class="ql-title">Integrations</div><div class="ql-sub">Connect dev tools</div></div>
+        </a>
+        <a href="/events/export" class="quick-link" target="_blank">
+          <span class="ql-icon">📥</span>
+          <div><div class="ql-title">Export CSV</div><div class="ql-sub">Download event data</div></div>
         </a>
         <a href="/admin" class="quick-link">
           <span class="ql-icon">⚙</span>
-          <div>
-            <div class="ql-title">Admin Settings</div>
-            <div class="ql-sub">Configure Bentley integration</div>
-          </div>
+          <div><div class="ql-title">Admin Settings</div><div class="ql-sub">Configure Bentley</div></div>
         </a>
-        <a href="/webhook" onclick="seedDemo(event)" class="quick-link">
+        <a href="#" onclick="openTestModal();return false;" class="quick-link">
           <span class="ql-icon">⚡</span>
-          <div>
-            <div class="ql-title">Send Test Event</div>
-            <div class="ql-sub">Inject a demo webhook</div>
-          </div>
+          <div><div class="ql-title">Send Test Event</div><div class="ql-sub">Inject a demo webhook</div></div>
         </a>
       </div>
     </div>
@@ -152,11 +187,60 @@
 <div class="page-footer">
   <span id="lastUpdated">Auto-refreshes every 15s</span>
 </div>
+
+<!-- Test Event Modal -->
+<div class="test-modal-overlay" id="testModal">
+  <div class="test-modal">
+    <div class="test-modal-header">
+      ⚡ Send Test Event
+      <button onclick="closeTestModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.1rem;">✕</button>
+    </div>
+    <div class="test-modal-body">
+      <div class="form-group">
+        <label class="form-label">Event Type</label>
+        <select id="testEventType" class="form-select">
+          <option value="iModels.iModelCreated.v1">iModels.iModelCreated.v1</option>
+          <option value="iModels.iModelUpdated.v1">iModels.iModelUpdated.v1</option>
+          <option value="iModels.iModelDeleted.v1">iModels.iModelDeleted.v1</option>
+          <option value="iTwins.iTwinCreated.v1">iTwins.iTwinCreated.v1</option>
+          <option value="iTwins.iTwinUpdated.v1">iTwins.iTwinUpdated.v1</option>
+          <option value="accessControl.memberAdded.v1">accessControl.memberAdded.v1</option>
+          <option value="synchronization.runCompleted.v1">synchronization.runCompleted.v1</option>
+          <option value="synchronization.runFailed.v1">synchronization.runFailed.v1</option>
+          <option value="issues.issueCreated.v1">issues.issueCreated.v1</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">iTwin Name</label>
+        <input type="text" id="testITwinName" class="form-input" value="Demo Project" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">iModel Name</label>
+        <input type="text" id="testIModelName" class="form-input" value="Test Model" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Quantity</label>
+        <select id="testCount" class="form-select">
+          <option value="1">1 event</option>
+          <option value="5">5 events</option>
+          <option value="10">10 events</option>
+          <option value="25">25 events</option>
+        </select>
+      </div>
+    </div>
+    <div class="test-modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeTestModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="sendTestEvents()">Send Events</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let currentRange = '24h';
+let autoRefreshInterval = null;
+let lastEventIds = new Set();
 
 async function refreshDashboard() {
   const btn = document.getElementById('refreshBtn');
@@ -170,10 +254,17 @@ async function refreshDashboard() {
     updateDist('categoryBars', d.categoryBreakdown, d.kpis.totalEvents);
     updateDist('typeBars', d.eventTypeBreakdown, d.kpis.totalEvents);
     document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
-  } catch(e) {
-    console.error(e);
-  }
+  } catch(e) { console.error(e); }
   btn.textContent = '↻ Refresh';
+}
+
+function toggleAutoRefresh() {
+  const on = document.getElementById('autoRefreshToggle').checked;
+  if (on) {
+    autoRefreshInterval = setInterval(refreshDashboard, 15000);
+  } else {
+    clearInterval(autoRefreshInterval);
+  }
 }
 
 function updateKPIs(kpis) {
@@ -181,10 +272,12 @@ function updateKPIs(kpis) {
   animNum('kpi-itwins', kpis.uniqueITwins);
   animNum('kpi-imodels', kpis.uniqueIModels);
   animNum('kpi-types', kpis.eventTypes);
+  animNum('kpi-integrations', kpis.integrationsConnected || 0);
 }
 
 function animNum(id, end) {
   const el = document.getElementById(id);
+  if (!el) return;
   const start = parseInt(el.textContent) || 0;
   if (start === end) { el.textContent = end; return; }
   let t = null;
@@ -210,28 +303,30 @@ function updateHealth(health, insights) {
 function updateEventsTable(events) {
   const body = document.getElementById('eventsBody');
   if (!events || events.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events yet</div><div class="empty-sub">Send a POST to /webhook to get started</div></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events yet</div><div class="empty-sub">Send a test event to get started</div></div></td></tr>';
     return;
   }
+  const newIds = new Set(events.map(e => e.id));
   body.innerHTML = events.map(e => {
     const d = new Date(e.received_at);
     const time = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
     const sev = e.severity || 'info';
-    return `<tr>
-      <td><code class="event-tag">${esc(e.event_type)}</code></td>
+    const isNew = !lastEventIds.has(e.id) && lastEventIds.size > 0;
+    return `<tr class="${isNew ? 'event-row-new' : ''}">
+      <td><span class="sev-tag sev-tag-${sev}"></span><code class="event-tag">${esc(e.event_type)}</code></td>
       <td><span class="cat-badge cat-${slugify(e.event_category)}">${esc(e.event_category)}</span></td>
       <td class="text-muted">${esc(e.itwin_name || e.itwin_id || '—')}</td>
-      <td class="text-muted">${esc(e.imodel_name || e.imodel_id || '—')}</td>
       <td><span class="sev-badge sev-${sev}">${sev}</span></td>
       <td class="text-muted text-sm">${time}</td>
     </tr>`;
   }).join('');
+  lastEventIds = newIds;
 }
 
 function updateDist(containerId, data, total) {
   const el = document.getElementById(containerId);
   if (!data || Object.keys(data).length === 0) {
-    el.innerHTML = '<div class="dist-placeholder">No data</div>';
+    el.innerHTML = '<div class="dist-placeholder">No data yet</div>';
     return;
   }
   const sorted = Object.entries(data).sort((a,b) => b[1]-a[1]).slice(0,6);
@@ -253,22 +348,31 @@ function esc(s) {
 }
 function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g, '-'); }
 
-async function seedDemo(e) {
-  e.preventDefault();
-  await fetch('/webhook', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      eventType: 'iModels.iModelCreated.v1',
-      content: {
-        iTwinId: 'demo-itwin-001',
-        iModelId: 'demo-imodel-' + Math.random().toString(36).slice(2,7),
-        iTwinName: 'Demo Project',
-        iModelName: 'Test Model'
-      }
-    })
-  });
-  setTimeout(refreshDashboard, 300);
+function openTestModal() { document.getElementById('testModal').classList.add('open'); }
+function closeTestModal() { document.getElementById('testModal').classList.remove('open'); }
+
+async function sendTestEvents() {
+  const eventType = document.getElementById('testEventType').value;
+  const iTwinName = document.getElementById('testITwinName').value || 'Demo Project';
+  const iModelName = document.getElementById('testIModelName').value || 'Test Model';
+  const count = parseInt(document.getElementById('testCount').value) || 1;
+  closeTestModal();
+  for (let i = 0; i < count; i++) {
+    await fetch('/webhook', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        eventType,
+        content: {
+          iTwinId: 'demo-itwin-' + Date.now(),
+          iModelId: 'demo-imodel-' + Math.random().toString(36).slice(2,7),
+          iTwinName, iModelName,
+        }
+      })
+    });
+  }
+  window._showToast && window._showToast(`Sent ${count} test event(s)`, 'success');
+  setTimeout(refreshDashboard, 400);
 }
 
 document.querySelectorAll('.tf-btn').forEach(btn => {
@@ -280,7 +384,12 @@ document.querySelectorAll('.tf-btn').forEach(btn => {
   });
 });
 
+document.getElementById('testModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('testModal')) closeTestModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeTestModal(); });
+
 refreshDashboard();
-setInterval(refreshDashboard, 15000);
+autoRefreshInterval = setInterval(refreshDashboard, 15000);
 </script>
 {% endblock %}

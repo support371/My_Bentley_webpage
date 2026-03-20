@@ -11,10 +11,10 @@
 <body>
 
 <nav class="navbar">
-  <div class="navbar-brand">
+  <a href="/dashboard" class="navbar-brand" style="text-decoration:none;color:inherit;">
     <span class="brand-icon">⬡</span>
     <span class="brand-name">iTwin Ops</span>
-  </div>
+  </a>
   <div class="navbar-links">
     <a href="/dashboard" class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}">
       <span class="nav-icon">◈</span><span class="nav-label">Overview</span>
@@ -35,7 +35,7 @@
   <div class="navbar-end">
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◑</button>
     {% if user %}
-      <span class="user-chip">{{ user.email[:20] }}…</span>
+      <span class="user-chip">{{ user.email[:22] }}</span>
       <a href="/logout" class="btn-sm btn-ghost">Sign out</a>
     {% else %}
       <a href="/login" class="btn-sm btn-primary">Sign in</a>
@@ -46,6 +46,11 @@
 <div class="page-container">
   {% block content %}{% endblock %}
 </div>
+
+<div id="toastContainer" style="
+  position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
+  display:flex; flex-direction:column; gap:.5rem; pointer-events:none;
+"></div>
 
 <script src="/static/js/app.js"></script>
 {% block scripts %}{% endblock %}

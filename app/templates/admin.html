@@ -5,7 +5,50 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Admin Settings</h1>
-    <p class="page-subtitle">Bentley integration, webhooks, and platform configuration</p>
+    <p class="page-subtitle">Bentley integration, webhooks, alerts and platform management</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-ghost btn-sm" onclick="loadStats()">↻ Stats</button>
+    <a href="/api/docs" target="_blank" class="btn btn-ghost btn-sm">API Docs ↗</a>
+  </div>
+</div>
+
+<!-- System Stats Bar -->
+<div id="statsBar" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+  <div class="kpi-card" style="padding:.875rem;">
+    <div class="kpi-icon kpi-blue" style="width:36px;height:36px;font-size:1.1rem;">◉</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Total Events</div>
+      <div class="kpi-value" id="stat-events" style="font-size:1.4rem;">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="padding:.875rem;">
+    <div class="kpi-icon kpi-purple" style="width:36px;height:36px;font-size:1.1rem;">◈</div>
+    <div class="kpi-body">
+      <div class="kpi-label">iTwins</div>
+      <div class="kpi-value" id="stat-itwins" style="font-size:1.4rem;">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="padding:.875rem;">
+    <div class="kpi-icon kpi-teal" style="width:36px;height:36px;font-size:1.1rem;">⬡</div>
+    <div class="kpi-body">
+      <div class="kpi-label">iModels</div>
+      <div class="kpi-value" id="stat-imodels" style="font-size:1.4rem;">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="padding:.875rem;">
+    <div class="kpi-icon kpi-green" style="width:36px;height:36px;font-size:1rem;">🔌</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Integrations</div>
+      <div class="kpi-value" id="stat-integrations" style="font-size:1.4rem;">—</div>
+    </div>
+  </div>
+  <div class="kpi-card" style="padding:.875rem;">
+    <div class="kpi-icon kpi-orange" style="width:36px;height:36px;font-size:1rem;">⏱</div>
+    <div class="kpi-body">
+      <div class="kpi-label">Uptime</div>
+      <div class="kpi-value" id="stat-uptime" style="font-size:1.1rem;">—</div>
+    </div>
   </div>
 </div>
 
@@ -19,13 +62,11 @@
           {% if bentley_configured %}Configured{% else %}Not configured{% endif %}
         </span>
       </div>
-
       {% if not bentley_configured %}
       <div class="alert alert-info">
         Set <code>BENTLEY_CLIENT_ID</code> and <code>BENTLEY_CLIENT_SECRET</code> in your environment to enable live Bentley API integration.
       </div>
       {% endif %}
-
       <div class="form-grid">
         <div class="form-group">
           <label class="form-label">Client ID</label>
@@ -56,7 +97,7 @@
       <p class="text-muted mb-2">Register this URL in your Bentley webhook subscription:</p>
       <div class="copy-box">
         <code id="webhookUrl">{{ request.base_url }}webhook</code>
-        <button class="btn btn-ghost btn-xs" onclick="copyWebhookUrl()">Copy</button>
+        <button class="btn btn-ghost btn-xs" onclick="_copyText(document.getElementById('webhookUrl').textContent, 'Webhook URL')">Copy</button>
       </div>
       <div class="form-group mt-2">
         <label class="form-label">Webhook Secret (env: WEBHOOK_SECRET)</label>
@@ -85,6 +126,45 @@
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
+        <h2 class="card-title">Data Management</h2>
+      </div>
+      <div class="info-list" style="margin-bottom:1rem;">
+        <div class="info-row">
+          <span>Deliveries</span>
+          <code id="dm-deliveries">—</code>
+        </div>
+        <div class="info-row">
+          <span>Processed OK</span>
+          <code id="dm-processed" style="color:var(--green)">—</code>
+        </div>
+        <div class="info-row">
+          <span>Errors</span>
+          <code id="dm-errors" style="color:var(--red)">—</code>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Delete events older than</label>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <select id="deleteOlderDays" class="form-select sm" style="width:auto;">
+            <option value="7">7 days</option>
+            <option value="30" selected>30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" style="border-color:var(--red);color:var(--red);"
+            onclick="deleteOldEvents()">🗑 Purge</button>
+        </div>
+      </div>
+      <div style="margin-top:.75rem;">
+        <button class="btn btn-ghost btn-sm" onclick="seedDemoEvents()">⚡ Seed 10 Demo Events</button>
+        <a href="/events/export" target="_blank" class="btn btn-ghost btn-sm">📥 Export CSV</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
         <h2 class="card-title">Recent Webhook Deliveries</h2>
       </div>
       <div class="table-wrap">
@@ -98,14 +178,11 @@
               <td class="text-sm text-muted">{{ d.received_at.strftime('%H:%M:%S') }}</td>
               <td class="text-sm">{{ d.remote_ip or '—' }}</td>
               <td>
-                {% if d.signature_valid %}
-                <span class="badge badge-green">✓</span>
-                {% else %}
-                <span class="badge badge-red">✗</span>
-                {% endif %}
+                {% if d.signature_valid %}<span class="badge badge-green">✓</span>
+                {% else %}<span class="badge badge-red">✗</span>{% endif %}
               </td>
               <td>
-                <span class="badge {% if d.processing_status == 'processed' %}badge-green{% elif d.processing_status == 'rejected' %}badge-red{% else %}badge-gray{% endif %}">
+                <span class="badge {% if d.processing_status == 'processed' %}badge-green{% elif d.processing_status == 'error' %}badge-red{% else %}badge-gray{% endif %}">
                   {{ d.processing_status }}
                 </span>
               </td>
@@ -143,13 +220,14 @@
       <div class="info-list">
         <div class="info-row"><span>Version</span><code>{{ settings.APP_VERSION }}</code></div>
         <div class="info-row"><span>Environment</span><code>{{ settings.ENVIRONMENT }}</code></div>
-        <div class="info-row"><span>Database</span><code>{{ 'SQLite' if 'sqlite' in settings.DATABASE_URL else 'Postgres' }}</code></div>
+        <div class="info-row"><span>Database</span><code>{{ 'SQLite' if 'sqlite' in settings.DATABASE_URL else 'PostgreSQL' }}</code></div>
         <div class="info-row"><span>Signature verify</span><code>{{ 'disabled' if settings.SKIP_SIGNATURE_VERIFY else 'enabled' }}</code></div>
         <div class="info-row"><span>JWT expire</span><code>{{ settings.JWT_EXPIRE_MINUTES }} min</code></div>
       </div>
       <div class="action-row mt-2">
         <a href="/api/docs" target="_blank" class="btn btn-ghost btn-sm">API Docs →</a>
-        <a href="/health" target="_blank" class="btn btn-ghost btn-sm">Health Check →</a>
+        <a href="/health" target="_blank" class="btn btn-ghost btn-sm">Health →</a>
+        <a href="/api/stats" target="_blank" class="btn btn-ghost btn-sm">Stats →</a>
       </div>
     </div>
   </div>
@@ -178,10 +256,11 @@
       </div>
       <div class="form-group">
         <label class="form-label">Match Values (comma-separated)</label>
-        <input type="text" id="ruleValuesInput" class="form-input" placeholder="iModels.iModelDeleted.v1, accessControl.memberRemoved.v1" />
+        <input type="text" id="ruleValuesInput" class="form-input"
+          placeholder="iModels.iModelDeleted.v1, accessControl.memberRemoved.v1" />
       </div>
       <div class="form-group">
-        <label class="form-label">Slack Webhook URL (optional)</label>
+        <label class="form-label">Notification Webhook URL (Slack, Discord, etc.)</label>
         <input type="url" id="ruleSlackUrl" class="form-input" placeholder="https://hooks.slack.com/..." />
       </div>
       <div class="action-row">
@@ -196,6 +275,21 @@
 
 {% block scripts %}
 <script>
+async function loadStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const d = await r.json();
+    document.getElementById('stat-events').textContent = d.total_events.toLocaleString();
+    document.getElementById('stat-itwins').textContent = d.total_itwins.toLocaleString();
+    document.getElementById('stat-imodels').textContent = d.total_imodels.toLocaleString();
+    document.getElementById('stat-integrations').textContent = d.integrations_connected;
+    document.getElementById('stat-uptime').textContent = d.uptime_human;
+    document.getElementById('dm-deliveries').textContent = d.total_deliveries.toLocaleString();
+    document.getElementById('dm-processed').textContent = d.processed_ok.toLocaleString();
+    document.getElementById('dm-errors').textContent = d.processing_errors.toLocaleString();
+  } catch(e) {}
+}
+
 async function testConnection() {
   const result = document.getElementById('connectionResult');
   result.textContent = '…testing';
@@ -209,6 +303,7 @@ async function testConnection() {
     const d = await res.json();
     result.textContent = d.connected ? '✓ Connected' : '✗ ' + (d.error || 'Failed');
     result.className = 'inline-result ' + (d.connected ? 'ok' : 'err');
+    _showToast(d.connected ? 'Bentley connected' : 'Connection failed', d.connected ? 'success' : 'error');
   } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
 }
 
@@ -226,6 +321,7 @@ async function fetchITwins() {
     if (d.count !== undefined) {
       result.textContent = `✓ Found ${d.count} iTwins`;
       result.className = 'inline-result ok';
+      _showToast(`Found ${d.count} iTwins`, 'success');
     } else {
       result.textContent = '✗ ' + (d.detail || 'Failed');
       result.className = 'inline-result err';
@@ -243,21 +339,19 @@ async function listBentleyWebhooks() {
     if (d.webhooks) {
       panel.innerHTML = d.webhooks.length === 0
         ? '<em>No webhooks registered yet</em>'
-        : '<ul>' + d.webhooks.map(w => `<li><code>${w.id}</code> — ${w.callbackUrl || ''} (${w.isActive ? 'active' : 'inactive'})</li>`).join('') + '</ul>';
+        : '<ul>' + d.webhooks.map(w => `<li><code>${w.id}</code> — ${w.callbackUrl||''} (${w.isActive?'active':'inactive'})</li>`).join('') + '</ul>';
     } else {
       panel.textContent = 'Error: ' + (d.detail || 'Unknown error');
     }
   } catch(e) { panel.textContent = 'Request failed: ' + e.message; }
 }
 
-function copyWebhookUrl() {
-  const url = document.getElementById('webhookUrl').textContent;
-  navigator.clipboard.writeText(url).then(() => alert('Copied: ' + url));
+function showCreateWebhookModal() {
+  _showToast('Use POST /admin/webhooks/create — see API Docs', 'info');
 }
 
 function showAlertRuleModal() { document.getElementById('alertRuleModal').classList.remove('hidden'); }
 function closeAlertModal() { document.getElementById('alertRuleModal').classList.add('hidden'); }
-function showCreateWebhookModal() { alert('Register webhook via POST /admin/webhooks/create — see API docs at /api/docs'); }
 
 async function createAlertRule() {
   const name = document.getElementById('ruleNameInput').value;
@@ -265,19 +359,18 @@ async function createAlertRule() {
   const vals = document.getElementById('ruleValuesInput').value.split(',').map(s=>s.trim()).filter(Boolean);
   const slackUrl = document.getElementById('ruleSlackUrl').value;
   const result = document.getElementById('ruleResult');
-
-  const keyMap = {event_type_match: 'event_types', category_match: 'categories', severity_match: 'severities'};
+  const keyMap = {event_type_match:'event_types', category_match:'categories', severity_match:'severities'};
   const body = {
     name, rule_type: type,
     conditions: {[keyMap[type]]: vals},
     destinations: slackUrl ? [{type:'slack', url:slackUrl}] : []
   };
-
   try {
     const res = await fetch('/admin/alert-rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await res.json();
     result.textContent = '✓ Created: ' + d.name;
     result.className = 'inline-result ok';
+    _showToast('Alert rule created: ' + d.name, 'success');
     loadAlertRules();
     setTimeout(closeAlertModal, 1500);
   } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
@@ -287,18 +380,36 @@ async function loadAlertRules() {
   const el = document.getElementById('alertRulesList');
   const res = await fetch('/admin/alert-rules');
   const d = await res.json();
-  if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules yet</div>'; return; }
+  if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules configured yet</div>'; return; }
   el.innerHTML = d.rules.map(r => `
     <div class="alert-rule-item">
       <div>
         <strong>${r.name}</strong>
-        <span class="badge badge-gray">${r.rule_type}</span>
+        <span class="badge badge-gray" style="margin-left:.4rem">${r.rule_type}</span>
       </div>
       <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Muted'}</span>
     </div>
   `).join('');
 }
 
+async function deleteOldEvents() {
+  const days = document.getElementById('deleteOlderDays').value;
+  if (!confirm(`Delete all events older than ${days} days? This cannot be undone.`)) return;
+  const res = await fetch(`/api/events/old?days=${days}`, {method:'DELETE'});
+  const d = await res.json();
+  _showToast(`Deleted ${d.deleted} events older than ${days} days`, d.deleted > 0 ? 'warning' : 'info');
+  loadStats();
+}
+
+async function seedDemoEvents() {
+  const res = await fetch('/api/events/demo?count=10', {method:'POST'});
+  const d = await res.json();
+  _showToast(`Seeded ${d.seeded} demo events`, 'success');
+  loadStats();
+}
+
 loadAlertRules();
+loadStats();
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAlertModal(); });
 </script>
 {% endblock %}

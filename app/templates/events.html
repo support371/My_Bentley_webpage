@@ -1,6 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Event Stream — {{ app_name }}{% endblock %}
 
+{% block head %}
+<style>
+.filter-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .6rem;
+  border-radius:20px; background:var(--primary); color:#fff; font-size:.75rem; }
+.filter-chip button { background:none; border:none; color:#fff; cursor:pointer;
+  padding:0; font-size:.9rem; line-height:1; opacity:.7; }
+.filter-chip button:hover { opacity:1; }
+.active-filters { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:.5rem; }
+.export-btn { display:inline-flex; align-items:center; gap:.4rem; }
+.detail-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1rem; }
+.detail-tab { padding:.4rem 1rem; border:none; background:none; cursor:pointer;
+  font-size:.85rem; color:var(--text-muted); border-bottom:2px solid transparent;
+  transition:all .15s; }
+.detail-tab.active { color:var(--primary); border-bottom-color:var(--primary); font-weight:600; }
+.copy-btn { padding:.2rem .5rem; border-radius:4px; border:1px solid var(--border);
+  background:var(--bg); cursor:pointer; font-size:.75rem; color:var(--text-muted); }
+.copy-btn:hover { color:var(--primary); border-color:var(--primary); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
@@ -8,20 +28,24 @@
     <p class="page-subtitle">All incoming Bentley iTwin webhook events</p>
   </div>
   <div class="page-actions">
+    <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+      <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()"> Live
+    </label>
+    <a href="/events/export" class="btn btn-ghost btn-sm export-btn" target="_blank">📥 Export CSV</a>
     <button class="btn btn-primary btn-sm" onclick="loadEvents()">↻ Refresh</button>
   </div>
 </div>
 
 <div class="card filter-bar">
   <div class="filter-row">
-    <div class="filter-group">
-      <label class="filter-label">Event Type</label>
-      <input type="text" id="filterType" class="form-input sm" placeholder="e.g. iModels.iModelCreated.v1" />
+    <div class="filter-group" style="max-width:240px;">
+      <label class="filter-label">Search</label>
+      <input type="text" id="filterSearch" class="form-input sm" placeholder="Event type, iTwin, iModel…" />
     </div>
-    <div class="filter-group">
+    <div class="filter-group" style="max-width:180px;">
       <label class="filter-label">Category</label>
       <select id="filterCategory" class="form-select sm">
-        <option value="">All</option>
+        <option value="">All categories</option>
         <option>iModels</option>
         <option>iTwins</option>
         <option>Access Control</option>
@@ -33,21 +57,34 @@
         <option>Changed Elements</option>
       </select>
     </div>
-    <div class="filter-group">
+    <div class="filter-group" style="max-width:140px;">
+      <label class="filter-label">Severity</label>
+      <select id="filterSeverity" class="form-select sm">
+        <option value="">All severities</option>
+        <option value="info">Info</option>
+        <option value="success">Success</option>
+        <option value="warning">Warning</option>
+        <option value="error">Error</option>
+      </select>
+    </div>
+    <div class="filter-group" style="max-width:180px;">
       <label class="filter-label">iTwin ID</label>
       <input type="text" id="filterITwin" class="form-input sm" placeholder="Filter by iTwin ID" />
     </div>
-    <button class="btn btn-primary btn-sm" onclick="loadEvents()">Apply</button>
-    <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+    <div style="display:flex;gap:.4rem;align-items:flex-end;padding-bottom:1px;">
+      <button class="btn btn-primary btn-sm" onclick="applyFilters()">Apply</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearFilters()">Clear</button>
+    </div>
   </div>
+  <div class="active-filters" id="activeFilters"></div>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title">Events <span class="badge" id="eventCount">—</span></h2>
+    <h2 class="card-title">Events <span class="badge badge-gray" id="eventCount">—</span></h2>
     <div class="pagination-controls">
-      <button class="btn btn-ghost btn-sm" id="prevBtn" onclick="changePage(-1)">← Prev</button>
       <span id="pageInfo" class="text-muted text-sm">Page 1</span>
+      <button class="btn btn-ghost btn-sm" id="prevBtn" onclick="changePage(-1)">← Prev</button>
       <button class="btn btn-ghost btn-sm" id="nextBtn" onclick="changePage(1)">Next →</button>
     </div>
   </div>
@@ -71,15 +108,28 @@
   </div>
 </div>
 
+<!-- Event Detail Modal -->
 <div id="eventModal" class="modal hidden">
   <div class="modal-backdrop" onclick="closeModal()"></div>
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:700px;">
     <div class="modal-header">
-      <h3 id="modalTitle">Event Detail</h3>
-      <button onclick="closeModal()" class="modal-close">✕</button>
+      <h3 id="modalTitle" style="font-size:.95rem;font-family:monospace;word-break:break-all;">Event Detail</h3>
+      <div style="display:flex;gap:.4rem;align-items:center;">
+        <button class="copy-btn" onclick="copyEventJson()" title="Copy JSON">Copy JSON</button>
+        <button onclick="closeModal()" class="modal-close">✕</button>
+      </div>
     </div>
-    <div class="modal-body">
-      <pre id="modalBody" class="code-block"></pre>
+    <div class="modal-body" style="padding:0;">
+      <div class="detail-tabs">
+        <button class="detail-tab active" onclick="switchTab('formatted', this)">Formatted</button>
+        <button class="detail-tab" onclick="switchTab('raw', this)">Raw JSON</button>
+        <button class="detail-tab" onclick="switchTab('metadata', this)">Metadata</button>
+      </div>
+      <div style="padding:1rem;">
+        <div id="tabFormatted"></div>
+        <pre id="tabRaw" class="code-block" style="display:none"></pre>
+        <div id="tabMetadata" style="display:none"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -89,52 +139,100 @@
 <script>
 let page = 1;
 let totalPages = 1;
+let activeFilters = {};
+let autoInterval = null;
+let currentEventData = null;
 
 function esc(s) {
   if (!s) return '';
   const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
 }
-function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function slugify(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'-'); }
+
+function applyFilters() {
+  activeFilters = {};
+  const search = document.getElementById('filterSearch').value.trim();
+  const cat = document.getElementById('filterCategory').value;
+  const sev = document.getElementById('filterSeverity').value;
+  const itwin = document.getElementById('filterITwin').value.trim();
+  if (search) activeFilters.search = search;
+  if (cat) activeFilters.category = cat;
+  if (sev) activeFilters.severity = sev;
+  if (itwin) activeFilters.itwin_id = itwin;
+  page = 1;
+  renderActiveFilters();
+  loadEvents();
+}
+
+function renderActiveFilters() {
+  const el = document.getElementById('activeFilters');
+  el.innerHTML = Object.entries(activeFilters).map(([k, v]) =>
+    `<span class="filter-chip">${k}: ${v}
+      <button onclick="removeFilter('${k}')">×</button>
+    </span>`
+  ).join('');
+}
+
+function removeFilter(key) {
+  delete activeFilters[key];
+  const map = {search:'filterSearch', category:'filterCategory', severity:'filterSeverity', itwin_id:'filterITwin'};
+  if (map[key]) {
+    const el = document.getElementById(map[key]);
+    if (el.tagName === 'SELECT') el.value = ''; else el.value = '';
+  }
+  page = 1;
+  renderActiveFilters();
+  loadEvents();
+}
 
 async function loadEvents() {
-  const type = document.getElementById('filterType').value;
-  const cat = document.getElementById('filterCategory').value;
-  const itwin = document.getElementById('filterITwin').value;
   let url = `/events?page=${page}&page_size=50`;
-  if (type) url += `&event_type=${encodeURIComponent(type)}`;
-  if (cat) url += `&category=${encodeURIComponent(cat)}`;
-  if (itwin) url += `&itwin_id=${encodeURIComponent(itwin)}`;
-
-  const body = document.getElementById('eventsBody');
-  body.innerHTML = '<tr><td colspan="7" class="empty-cell">Loading…</td></tr>';
-
-  const res = await fetch(url);
-  const d = await res.json();
-  const events = d.events;
-  totalPages = Math.ceil(d.total / d.page_size) || 1;
-  document.getElementById('eventCount').textContent = d.total;
-  document.getElementById('pageInfo').textContent = `Page ${d.page} of ${totalPages}`;
-  document.getElementById('prevBtn').disabled = d.page <= 1;
-  document.getElementById('nextBtn').disabled = d.page >= totalPages;
-
-  if (!events.length) {
-    body.innerHTML = '<tr><td colspan="7" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events found</div></div></td></tr>';
-    return;
+  for (const [k, v] of Object.entries(activeFilters)) {
+    url += `&${k}=${encodeURIComponent(v)}`;
   }
-  body.innerHTML = events.map(e => {
-    const dt = new Date(e.received_at);
-    const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    const sev = e.severity || 'info';
-    return `<tr>
-      <td><code class="event-tag">${esc(e.event_type)}</code></td>
-      <td><span class="cat-badge cat-${slugify(e.event_category)}">${esc(e.event_category)}</span></td>
-      <td class="text-muted">${esc(e.itwin_name || e.itwin_id || '—')}</td>
-      <td class="text-muted">${esc(e.imodel_name || e.imodel_id || '—')}</td>
-      <td><span class="sev-badge sev-${sev}">${sev}</span></td>
-      <td class="text-muted text-sm">${ts}</td>
-      <td><button class="btn btn-ghost btn-xs" onclick="viewEvent('${esc(e.id)}')">Detail</button></td>
-    </tr>`;
-  }).join('');
+  const body = document.getElementById('eventsBody');
+  body.innerHTML = '<tr><td colspan="7" class="empty-cell" style="padding:1.5rem">Loading…</td></tr>';
+  try {
+    const res = await fetch(url);
+    const d = await res.json();
+    const events = d.events;
+    totalPages = Math.ceil(d.total / d.page_size) || 1;
+    document.getElementById('eventCount').textContent = d.total.toLocaleString();
+    document.getElementById('pageInfo').textContent = `Page ${d.page} of ${totalPages}`;
+    document.getElementById('prevBtn').disabled = d.page <= 1;
+    document.getElementById('nextBtn').disabled = d.page >= totalPages;
+    if (!events.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty-cell"><div class="empty-state"><div class="empty-icon">◎</div><div>No events found</div></div></td></tr>';
+      return;
+    }
+    body.innerHTML = events.map(e => {
+      const dt = new Date(e.received_at);
+      const ts = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      const sev = e.severity || 'info';
+      return `<tr>
+        <td><code class="event-tag" title="${esc(e.event_type)}">${esc(e.event_type)}</code></td>
+        <td><span class="cat-badge cat-${slugify(e.event_category)}">${esc(e.event_category)}</span></td>
+        <td class="text-muted">${esc(e.itwin_name || e.itwin_id || '—')}</td>
+        <td class="text-muted">${esc(e.imodel_name || e.imodel_id || '—')}</td>
+        <td><span class="sev-badge sev-${sev}">${sev}</span></td>
+        <td class="text-muted text-sm" style="white-space:nowrap">${ts}</td>
+        <td><button class="btn btn-ghost btn-xs" onclick="viewEvent('${esc(e.id)}')">Detail</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="7" class="empty-cell"><span style="color:var(--red)">Error loading events: ${e.message}</span></td></tr>`;
+  }
+}
+
+function clearFilters() {
+  activeFilters = {};
+  document.getElementById('filterSearch').value = '';
+  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterSeverity').value = '';
+  document.getElementById('filterITwin').value = '';
+  page = 1;
+  renderActiveFilters();
+  loadEvents();
 }
 
 function changePage(dir) {
@@ -142,25 +240,62 @@ function changePage(dir) {
   loadEvents();
 }
 
-function clearFilters() {
-  document.getElementById('filterType').value = '';
-  document.getElementById('filterCategory').value = '';
-  document.getElementById('filterITwin').value = '';
-  page = 1;
-  loadEvents();
+function toggleAutoRefresh() {
+  const on = document.getElementById('autoRefreshToggle').checked;
+  if (on) { autoInterval = setInterval(loadEvents, 10000); }
+  else { clearInterval(autoInterval); }
 }
 
 async function viewEvent(id) {
   const res = await fetch('/events/' + id);
   const d = await res.json();
+  currentEventData = d;
   document.getElementById('modalTitle').textContent = d.event_type;
-  document.getElementById('modalBody').textContent = JSON.stringify(d, null, 2);
+  renderFormatted(d);
+  document.getElementById('tabRaw').textContent = JSON.stringify(d, null, 2);
+  renderMetadata(d);
   document.getElementById('eventModal').classList.remove('hidden');
 }
 
-function closeModal() {
-  document.getElementById('eventModal').classList.add('hidden');
+function renderFormatted(d) {
+  const fields = [
+    ['Event Type', d.event_type], ['Category', d.event_category], ['Severity', d.severity || 'info'],
+    ['Status', d.processing_status], ['iTwin', d.itwin_name || d.itwin_id || '—'],
+    ['iModel', d.imodel_name || d.imodel_id || '—'],
+    ['Received', d.received_at ? new Date(d.received_at).toLocaleString() : '—'],
+    ['Message ID', d.message_id || '—'], ['ID', d.id],
+  ];
+  document.getElementById('tabFormatted').innerHTML = `<div class="info-list">${fields.map(([k, v]) =>
+    `<div class="info-row"><span style="color:var(--text-muted)">${k}</span><code style="font-size:.8rem">${esc(String(v))}</code></div>`
+  ).join('')}</div>`;
 }
+
+function renderMetadata(d) {
+  const raw = d.raw_payload || {};
+  document.getElementById('tabMetadata').innerHTML =
+    `<pre class="code-block" style="max-height:320px">${JSON.stringify(raw, null, 2)}</pre>`;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tabFormatted').style.display = name === 'formatted' ? '' : 'none';
+  document.getElementById('tabRaw').style.display = name === 'raw' ? '' : 'none';
+  document.getElementById('tabMetadata').style.display = name === 'metadata' ? '' : 'none';
+}
+
+function copyEventJson() {
+  if (!currentEventData) return;
+  navigator.clipboard.writeText(JSON.stringify(currentEventData, null, 2))
+    .then(() => { window._showToast && window._showToast('Copied to clipboard', 'success'); });
+}
+
+function closeModal() { document.getElementById('eventModal').classList.add('hidden'); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Enter' && document.activeElement.classList.contains('form-input')) applyFilters();
+});
 
 loadEvents();
 </script>

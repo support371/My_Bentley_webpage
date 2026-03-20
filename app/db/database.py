@@ -1,9 +1,12 @@
+import time
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import AsyncGenerator
 
 from app.core.config import settings
+
+_app_start_time: float = time.time()
 
 _db_url = settings.ASYNC_DATABASE_URL
 
