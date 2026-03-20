@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Request, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.database import get_session
@@ -15,18 +15,9 @@ router = APIRouter()
 logger = logging.getLogger("itwin_ops.webhook")
 
 
-async def _process_in_background(raw_body: bytes, headers: dict, session: AsyncSession):
-    try:
-        event = await process_webhook_event(raw_body, headers, session)
-        await evaluate_event(event, session)
-    except Exception as e:
-        logger.error(f"Background processing failed: {e}")
-
-
 @router.post("/webhook", response_model=WebhookIngestResponse, tags=["Ingestion"])
 async def ingest_webhook(
     request: Request,
-    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ):
     raw_body = await request.body()
@@ -55,6 +46,9 @@ async def ingest_webhook(
     try:
         data = json.loads(raw_body) if raw_body else {}
     except json.JSONDecodeError:
+        delivery.processing_status = "error"
+        delivery.error_message = "Invalid JSON payload"
+        await session.commit()
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     event = await process_webhook_event(raw_body, headers, session)

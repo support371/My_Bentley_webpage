@@ -339,7 +339,7 @@ async function listBentleyWebhooks() {
     if (d.webhooks) {
       panel.innerHTML = d.webhooks.length === 0
         ? '<em>No webhooks registered yet</em>'
-        : '<ul>' + d.webhooks.map(w => `<li><code>${w.id}</code> — ${w.callbackUrl||''} (${w.isActive?'active':'inactive'})</li>`).join('') + '</ul>';
+        : '<ul>' + d.webhooks.map(w => `<li><code>${_esc(w.id)}</code> — ${_esc(w.callbackUrl||'')} (${w.isActive?'active':'inactive'})</li>`).join('') + '</ul>';
     } else {
       panel.textContent = 'Error: ' + (d.detail || 'Unknown error');
     }
@@ -376,6 +376,11 @@ async function createAlertRule() {
   } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
 }
 
+function _esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
 async function loadAlertRules() {
   const el = document.getElementById('alertRulesList');
   const res = await fetch('/admin/alert-rules');
@@ -384,8 +389,8 @@ async function loadAlertRules() {
   el.innerHTML = d.rules.map(r => `
     <div class="alert-rule-item">
       <div>
-        <strong>${r.name}</strong>
-        <span class="badge badge-gray" style="margin-left:.4rem">${r.rule_type}</span>
+        <strong>${_esc(r.name)}</strong>
+        <span class="badge badge-gray" style="margin-left:.4rem">${_esc(r.rule_type)}</span>
       </div>
       <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Muted'}</span>
     </div>

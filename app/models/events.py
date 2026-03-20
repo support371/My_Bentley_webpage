@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Column
-from sqlalchemy import Text, JSON
-from typing import Optional, Dict, Any
+from sqlalchemy import Text
+from typing import Optional
 from datetime import datetime
 import uuid
 

@@ -27,9 +27,14 @@ def test_webhook_signature_skip_when_empty():
 def test_webhook_signature_valid():
     import hmac, hashlib
     from app.core.config import settings
-    settings.SKIP_SIGNATURE_VERIFY = False
-    settings.WEBHOOK_SECRET = "test-secret"
-    payload = b'{"eventType":"test"}'
-    sig = hmac.new(b"test-secret", payload, hashlib.sha256).hexdigest()
-    assert verify_webhook_signature(payload, sig) is True
-    settings.SKIP_SIGNATURE_VERIFY = True
+    original_skip = settings.SKIP_SIGNATURE_VERIFY
+    original_secret = settings.WEBHOOK_SECRET
+    try:
+        settings.SKIP_SIGNATURE_VERIFY = False
+        settings.WEBHOOK_SECRET = "test-secret"
+        payload = b'{"eventType":"test"}'
+        sig = hmac.new(b"test-secret", payload, hashlib.sha256).hexdigest()
+        assert verify_webhook_signature(payload, sig) is True
+    finally:
+        settings.SKIP_SIGNATURE_VERIFY = original_skip
+        settings.WEBHOOK_SECRET = original_secret

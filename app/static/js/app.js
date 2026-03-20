@@ -37,7 +37,12 @@ window._showToast = function(message, type, duration) {
     'opacity:0;transform:translateY(8px);transition:all .22s ease-out;',
     'max-width:320px;word-break:break-word;'
   ].join('');
-  toast.innerHTML = '<span>' + c.icon + '</span><span>' + message + '</span>';
+  var iconSpan = document.createElement('span');
+  iconSpan.textContent = c.icon;
+  var msgSpan = document.createElement('span');
+  msgSpan.textContent = message;
+  toast.appendChild(iconSpan);
+  toast.appendChild(msgSpan);
   toast.onclick = function() { _dismissToast(toast); };
   container.appendChild(toast);
   requestAnimationFrame(function() {

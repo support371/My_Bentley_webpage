@@ -466,7 +466,7 @@ def compute_callback_url(request=None) -> Dict[str, Any]:
         url = "(unknown — set PUBLIC_BASE_URL)"
         source = "none"
 
-    is_public = url.startswith("https://") and ".replit." in url or (
+    is_public = (url.startswith("https://") and ".replit." in url) or (
         public and not url.startswith("http://localhost")
     )
 

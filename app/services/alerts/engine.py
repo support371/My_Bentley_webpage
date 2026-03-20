@@ -23,6 +23,8 @@ async def evaluate_event(event: Event, session: AsyncSession):
     )
     rules = result.scalars().all()
 
+    matched_alerts = []
+
     for rule in rules:
         if rule.muted_until and rule.muted_until > datetime.utcnow():
             continue
@@ -49,9 +51,12 @@ async def evaluate_event(event: Event, session: AsyncSession):
                 severity=event.severity,
             )
             session.add(alert)
-            await session.commit()
-
             destinations = json.loads(rule.destinations or "[]")
+            matched_alerts.append((alert, destinations))
+
+    if matched_alerts:
+        await session.commit()
+        for alert, destinations in matched_alerts:
             for dest in destinations:
                 await dispatch_alert(dest, alert, event)
 

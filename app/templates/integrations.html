@@ -204,7 +204,13 @@
            data-name="{{ item.name|lower }}"
            data-category="{{ item.category }}"
            data-status="{{ item.status }}"
-           onclick="openModal('{{ item.slug }}', '{{ item.name }}', '{{ item.icon_emoji }}', '{{ item.icon_color }}', '{{ item.category }}', '{{ item.description }}', '{{ item.docs_url or '' }}', '{{ item.status }}', {{ 'true' if item.has_credentials else 'false' }})">
+           data-display-name="{{ item.name }}"
+           data-icon-emoji="{{ item.icon_emoji }}"
+           data-icon-color="{{ item.icon_color }}"
+           data-description="{{ item.description }}"
+           data-docs-url="{{ item.docs_url or '' }}"
+           data-has-credentials="{{ 'true' if item.has_credentials else 'false' }}"
+           onclick="openModalFromCard(this)">
         <div class="card-head">
           <div class="card-icon" style="background: {{ item.icon_color }}22;">
             {{ item.icon_emoji }}
@@ -362,6 +368,20 @@
 let currentSlug = null;
 let currentStatus = null;
 let activeFilter = 'all';
+
+function openModalFromCard(el) {
+  openModal(
+    el.dataset.slug,
+    el.dataset.displayName,
+    el.dataset.iconEmoji,
+    el.dataset.iconColor,
+    el.dataset.category,
+    el.dataset.description,
+    el.dataset.docsUrl,
+    el.dataset.status,
+    el.dataset.hasCredentials === 'true'
+  );
+}
 
 function openModal(slug, name, icon, color, category, desc, docs, status, hasCreds) {
   currentSlug = slug;
