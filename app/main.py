@@ -9,7 +9,9 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.db.database import init_db
 from app.api.routes import auth, dashboard, events, webhooks, admin
+from app.api.routes import integrations
 from app.db.seed import seed_initial_data
+from app.models import integrations as _integrations_model  # ensure table is registered
 
 setup_logging()
 logger = logging.getLogger("itwin_ops")
@@ -49,6 +51,7 @@ app.include_router(dashboard.router)
 app.include_router(events.router)
 app.include_router(webhooks.router)
 app.include_router(admin.router)
+app.include_router(integrations.router)
 
 
 @app.get("/health", tags=["System"])
