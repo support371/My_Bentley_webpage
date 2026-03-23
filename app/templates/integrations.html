@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+{% block title %}Integrations — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+.integrations-hero {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 2rem 1.5rem 1.5rem;
+}
+.integrations-hero h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 .4rem; }
+.integrations-hero p { color: var(--text-secondary); margin: 0 0 1rem; font-size: .95rem; }
+.integrations-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.istat { display: flex; align-items: center; gap: .5rem; font-size: .9rem; }
+.istat-dot { width: 10px; height: 10px; border-radius: 50%; }
+.istat-dot.connected { background: var(--green); }
+.istat-dot.total { background: var(--text-secondary); }
+
+.integrations-toolbar {
+  padding: 1rem 1.5rem;
+  display: flex; gap: .75rem; flex-wrap: wrap; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.search-input {
+  flex: 1; min-width: 200px; max-width: 360px;
+  padding: .5rem .9rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-primary); font-size: .9rem;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.filter-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
+.filter-pill {
+  padding: .3rem .75rem; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg-secondary); cursor: pointer; font-size: .8rem;
+  transition: all .15s; color: var(--text-secondary);
+}
+.filter-pill:hover { border-color: var(--accent); color: var(--accent); }
+.filter-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.integrations-body { padding: 1.5rem; }
+.category-section { margin-bottom: 2.5rem; }
+.category-header {
+  font-size: .75rem; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-secondary);
+  margin-bottom: 1rem; padding-bottom: .4rem; border-bottom: 1px solid var(--border);
+}
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.integration-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: box-shadow .15s, border-color .15s;
+  cursor: pointer;
+  position: relative;
+}
+.integration-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); border-color: var(--accent); }
+.integration-card.connected { border-color: rgba(16,185,129,.3); }
+.integration-card.error { border-color: rgba(239,68,68,.3); }
+
+.card-head { display: flex; align-items: flex-start; gap: .85rem; margin-bottom: .75rem; }
+.card-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+}
+.card-meta { flex: 1; min-width: 0; }
+.card-name { font-weight: 600; font-size: .95rem; margin-bottom: .1rem; }
+.card-category { font-size: .72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .05em; }
+.card-badge {
+  padding: .15rem .5rem; border-radius: 20px; font-size: .7rem; font-weight: 600;
+  white-space: nowrap; align-self: flex-start;
+}
+.badge-connected { background: rgba(16,185,129,.15); color: var(--green); }
+.badge-error { background: rgba(239,68,68,.12); color: var(--red); }
+.badge-disconnected { background: var(--bg-secondary); color: var(--text-secondary); }
+
+.card-desc { font-size: .82rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 1rem; }
+.card-actions { display: flex; gap: .5rem; justify-content: space-between; align-items: center; }
+.btn-connect {
+  padding: .4rem .9rem; border-radius: 7px; font-size: .82rem; font-weight: 600;
+  border: none; cursor: pointer; transition: all .15s;
+}
+.btn-connect.primary { background: var(--accent); color: #fff; }
+.btn-connect.primary:hover { filter: brightness(1.1); }
+.btn-connect.ghost {
+  background: transparent; border: 1px solid var(--border); color: var(--text-secondary);
+}
+.btn-connect.ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-connect.danger { background: transparent; border: 1px solid var(--red); color: var(--red); }
+.btn-connect.danger:hover { background: var(--red); color: #fff; }
+.card-docs { font-size: .75rem; color: var(--accent); text-decoration: none; }
+.card-docs:hover { text-decoration: underline; }
+.last-tested { font-size: .72rem; color: var(--text-secondary); }
+
+.custom-integration-cta {
+  background: var(--bg-card); border: 2px dashed var(--border);
+  border-radius: 12px; padding: 2rem; text-align: center;
+  cursor: pointer; transition: border-color .15s;
+}
+.custom-integration-cta:hover { border-color: var(--accent); }
+.cta-icon { font-size: 2rem; margin-bottom: .5rem; }
+.cta-title { font-weight: 600; margin-bottom: .25rem; }
+.cta-desc { font-size: .85rem; color: var(--text-secondary); }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.6); z-index: 1000;
+  align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg-card); border-radius: 14px;
+  width: 100%; max-width: 480px; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,.3);
+  animation: slideUp .2s ease-out;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header {
+  display: flex; align-items: center; gap: .75rem;
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+}
+.modal-title { font-weight: 700; font-size: 1.05rem; flex: 1; }
+.modal-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text-secondary); }
+.modal-body { padding: 1.5rem; }
+.form-group { margin-bottom: 1.1rem; }
+.form-label { display: block; font-size: .83rem; font-weight: 600; margin-bottom: .35rem; color: var(--text-secondary); }
+.form-input {
+  width: 100%; padding: .55rem .85rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-secondary);
+  color: var(--text-primary); font-size: .9rem; box-sizing: border-box;
+}
+.form-input:focus { outline: none; border-color: var(--accent); }
+.form-help { font-size: .75rem; color: var(--text-secondary); margin-top: .25rem; }
+.modal-footer {
+  padding: 1rem 1.5rem; border-top: 1px solid var(--border);
+  display: flex; gap: .5rem; justify-content: flex-end;
+}
+.btn-modal {
+  padding: .5rem 1.2rem; border-radius: 8px; font-size: .87rem;
+  font-weight: 600; border: none; cursor: pointer;
+}
+.btn-modal.primary { background: var(--accent); color: #fff; }
+.btn-modal.ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+
+.test-result {
+  margin-top: 1rem; padding: .75rem; border-radius: 8px;
+  font-size: .85rem; display: none;
+}
+.test-result.success { background: rgba(16,185,129,.12); color: var(--green); }
+.test-result.error { background: rgba(239,68,68,.1); color: var(--red); }
+
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-secondary); }
+.empty-state-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="integrations-hero">
+  <h1>🔌 Integrations</h1>
+  <p>Connect your dev ecosystem — source control, AI tools, CI/CD, observability, and more.</p>
+  <div class="integrations-stats">
+    <div class="istat">
+      <div class="istat-dot connected"></div>
+      <strong>{{ connected_count }}</strong> connected
+    </div>
+    <div class="istat">
+      <div class="istat-dot total"></div>
+      <strong>{{ total_count }}</strong> available
+    </div>
+  </div>
+</div>
+
+<div class="integrations-toolbar">
+  <input type="search" class="search-input" id="searchInput" placeholder="🔍  Search integrations…" oninput="filterCards()">
+  <div class="filter-pills" id="filterPills">
+    <button class="filter-pill active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-pill" onclick="setFilter('connected', this)">✅ Connected</button>
+    <button class="filter-pill" onclick="setFilter('Source Control', this)">Source Control</button>
+    <button class="filter-pill" onclick="setFilter('AI & LLM', this)">AI & LLM</button>
+    <button class="filter-pill" onclick="setFilter('Cloud & Deploy', this)">Cloud & Deploy</button>
+    <button class="filter-pill" onclick="setFilter('Dev Tools', this)">Dev Tools</button>
+    <button class="filter-pill" onclick="setFilter('CI/CD', this)">CI/CD</button>
+    <button class="filter-pill" onclick="setFilter('Notifications', this)">Notifications</button>
+    <button class="filter-pill" onclick="setFilter('Observability', this)">Observability</button>
+  </div>
+</div>
+
+<div class="integrations-body">
+  {% for category, items in categories %}
+  <div class="category-section" data-category="{{ category }}">
+    <div class="category-header">{{ category }}</div>
+    <div class="integration-grid">
+      {% for item in items %}
+      <div class="integration-card {{ item.status }}"
+           data-slug="{{ item.slug }}"
+           data-name="{{ item.name|lower }}"
+           data-category="{{ item.category }}"
+           data-status="{{ item.status }}"
+           data-display-name="{{ item.name }}"
+           data-icon-emoji="{{ item.icon_emoji }}"
+           data-icon-color="{{ item.icon_color }}"
+           data-description="{{ item.description }}"
+           data-docs-url="{{ item.docs_url or '' }}"
+           data-has-credentials="{{ 'true' if item.has_credentials else 'false' }}"
+           onclick="openModalFromCard(this)">
+        <div class="card-head">
+          <div class="card-icon" style="background: {{ item.icon_color }}22;">
+            {{ item.icon_emoji }}
+          </div>
+          <div class="card-meta">
+            <div class="card-name">{{ item.name }}</div>
+            <div class="card-category">{{ item.category }}</div>
+          </div>
+          <span class="card-badge badge-{{ item.status }}">
+            {% if item.status == 'connected' %}● Connected
+            {% elif item.status == 'error' %}⚠ Error
+            {% else %}○ Not connected{% endif %}
+          </span>
+        </div>
+        <div class="card-desc">{{ item.description }}</div>
+        <div class="card-actions">
+          <div>
+            {% if item.last_tested_at %}
+            <span class="last-tested">Tested {{ item.last_tested_at.strftime('%b %d') }}</span>
+            {% endif %}
+          </div>
+          <div style="display:flex;gap:.4rem;">
+            {% if item.docs_url %}
+            <a href="{{ item.docs_url }}" target="_blank" class="card-docs" onclick="event.stopPropagation()">Docs ↗</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="category-section" id="customSection">
+    <div class="category-header">Custom Integrations</div>
+    <div class="integration-grid">
+      <div class="custom-integration-cta" onclick="openCustomModal()">
+        <div class="cta-icon">➕</div>
+        <div class="cta-title">Add Custom Integration</div>
+        <div class="cta-desc">Connect any service via webhook URL or API key</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="emptyState" style="display:none">
+    <div class="empty-state-icon">🔍</div>
+    <div>No integrations match your search</div>
+  </div>
+</div>
+
+<!-- Connect Modal -->
+<div class="modal-overlay" id="connectModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modalIcon" style="font-size:1.5rem"></span>
+      <div class="modal-title" id="modalTitle">Connect Integration</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="modalDesc" style="font-size:.88rem;color:var(--text-secondary);margin-bottom:1.25rem;line-height:1.5"></p>
+      <div class="form-group">
+        <label class="form-label">API Key / Token</label>
+        <input type="password" class="form-input" id="fieldApiKey" placeholder="Paste your API key or token…" autocomplete="new-password">
+        <div class="form-help">Stored encrypted. Used for authenticated API calls.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Webhook URL <span style="color:var(--text-secondary);font-weight:400">(optional)</span></label>
+        <input type="url" class="form-input" id="fieldWebhook" placeholder="https://hooks.example.com/…">
+        <div class="form-help">iTwin events will be forwarded to this endpoint.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Base URL <span style="color:var(--text-secondary);font-weight:400">(optional)</span></label>
+        <input type="url" class="form-input" id="fieldBaseUrl" placeholder="https://api.example.com">
+        <div class="form-help">Override the default API base URL for self-hosted services.</div>
+      </div>
+      <div id="testResult" class="test-result"></div>
+      <div id="docsLink" style="margin-top:.75rem;font-size:.82rem;display:none">
+        📘 <a id="docsAnchor" href="#" target="_blank" style="color:var(--accent)">View API documentation ↗</a>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal ghost" id="btnDisconnect" onclick="disconnectIntegration()" style="display:none;border-color:var(--red);color:var(--red)">Disconnect</button>
+      <button class="btn-modal ghost" onclick="testIntegration()">Test Connection</button>
+      <button class="btn-modal ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-modal primary" onclick="saveIntegration()">Save &amp; Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Integration Modal -->
+<div class="modal-overlay" id="customModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span style="font-size:1.5rem">🔌</span>
+      <div class="modal-title">Add Custom Integration</div>
+      <button class="modal-close" onclick="closeCustomModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Name *</label>
+        <input type="text" class="form-input" id="customName" placeholder="My Service">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Slug (ID) *</label>
+        <input type="text" class="form-input" id="customSlug" placeholder="my-service">
+        <div class="form-help">Lowercase, no spaces. Used as identifier.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-input" id="customCategory">
+          <option>Custom</option>
+          <option>Source Control</option>
+          <option>Cloud & Deploy</option>
+          <option>AI & LLM</option>
+          <option>Dev Tools</option>
+          <option>CI/CD</option>
+          <option>Notifications</option>
+          <option>Observability</option>
+          <option>Project Mgmt</option>
+          <option>Community</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-input" id="customDesc" placeholder="Brief description…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icon Emoji</label>
+        <input type="text" class="form-input" id="customEmoji" placeholder="🔌" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label class="form-label">API Key / Token</label>
+        <input type="password" class="form-input" id="customApiKey" placeholder="Optional">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Webhook URL</label>
+        <input type="url" class="form-input" id="customWebhook" placeholder="https://…">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Docs URL</label>
+        <input type="url" class="form-input" id="customDocs" placeholder="https://…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal ghost" onclick="closeCustomModal()">Cancel</button>
+      <button class="btn-modal primary" onclick="saveCustomIntegration()">Add Integration</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentSlug = null;
+let currentStatus = null;
+let activeFilter = 'all';
+
+function openModalFromCard(el) {
+  openModal(
+    el.dataset.slug,
+    el.dataset.displayName,
+    el.dataset.iconEmoji,
+    el.dataset.iconColor,
+    el.dataset.category,
+    el.dataset.description,
+    el.dataset.docsUrl,
+    el.dataset.status,
+    el.dataset.hasCredentials === 'true'
+  );
+}
+
+function openModal(slug, name, icon, color, category, desc, docs, status, hasCreds) {
+  currentSlug = slug;
+  currentStatus = status;
+  document.getElementById('modalIcon').textContent = icon;
+  document.getElementById('modalTitle').textContent = name;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('fieldApiKey').value = '';
+  document.getElementById('fieldWebhook').value = '';
+  document.getElementById('fieldBaseUrl').value = '';
+  document.getElementById('testResult').style.display = 'none';
+  const docsEl = document.getElementById('docsLink');
+  if (docs) {
+    docsEl.style.display = 'block';
+    document.getElementById('docsAnchor').href = docs;
+  } else {
+    docsEl.style.display = 'none';
+  }
+  const btnDisc = document.getElementById('btnDisconnect');
+  btnDisc.style.display = (status === 'connected' || hasCreds) ? 'block' : 'none';
+  document.getElementById('connectModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('connectModal').classList.remove('open');
+  currentSlug = null;
+}
+
+function openCustomModal() {
+  document.getElementById('customModal').classList.add('open');
+}
+
+function closeCustomModal() {
+  document.getElementById('customModal').classList.remove('open');
+}
+
+async function saveIntegration() {
+  if (!currentSlug) return;
+  const apiKey = document.getElementById('fieldApiKey').value.trim();
+  const webhook = document.getElementById('fieldWebhook').value.trim();
+  const baseUrl = document.getElementById('fieldBaseUrl').value.trim();
+  if (!apiKey && !webhook) {
+    showTestResult(false, 'Please enter at least an API key or webhook URL.'); return;
+  }
+  const res = await fetch('/api/integrations', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({slug: currentSlug, api_key: apiKey || null, webhook_url: webhook || null, base_url: baseUrl || null})
+  });
+  const data = await res.json();
+  if (res.ok) {
+    closeModal(); location.reload();
+  } else {
+    showTestResult(false, data.detail || 'Save failed.');
+  }
+}
+
+async function testIntegration() {
+  if (!currentSlug) return;
+  showTestResult(null, '⏳ Testing connection…');
+  try {
+    const res = await fetch(`/api/integrations/${currentSlug}/test`, {method: 'POST'});
+    const data = await res.json();
+    showTestResult(data.success, data.message);
+  } catch (e) {
+    showTestResult(false, 'Request failed: ' + e.message);
+  }
+}
+
+async function disconnectIntegration() {
+  if (!currentSlug || !confirm('Disconnect and remove credentials for this integration?')) return;
+  const res = await fetch(`/api/integrations/${currentSlug}`, {method: 'DELETE'});
+  if (res.ok) { closeModal(); location.reload(); }
+}
+
+async function saveCustomIntegration() {
+  const name = document.getElementById('customName').value.trim();
+  const slug = document.getElementById('customSlug').value.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!name || !slug) { alert('Name and Slug are required.'); return; }
+  const payload = {
+    slug, name,
+    category: document.getElementById('customCategory').value,
+    description: document.getElementById('customDesc').value.trim(),
+    icon_emoji: document.getElementById('customEmoji').value.trim() || '🔌',
+    api_key: document.getElementById('customApiKey').value.trim() || null,
+    webhook_url: document.getElementById('customWebhook').value.trim() || null,
+    docs_url: document.getElementById('customDocs').value.trim() || null,
+  };
+  const res = await fetch('/api/integrations', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (res.ok) { closeCustomModal(); location.reload(); }
+}
+
+function showTestResult(success, msg) {
+  const el = document.getElementById('testResult');
+  el.style.display = 'block';
+  el.className = 'test-result ' + (success === true ? 'success' : success === false ? 'error' : '');
+  el.textContent = msg;
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  filterCards();
+}
+
+function filterCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let anyVisible = false;
+  document.querySelectorAll('.integration-card').forEach(card => {
+    const name = card.dataset.name;
+    const cat = card.dataset.category;
+    const status = card.dataset.status;
+    const matchSearch = !q || name.includes(q) || cat.toLowerCase().includes(q);
+    const matchFilter = activeFilter === 'all'
+      || (activeFilter === 'connected' && status === 'connected')
+      || activeFilter === cat;
+    if (matchSearch && matchFilter) {
+      card.style.display = '';
+      anyVisible = true;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  document.querySelectorAll('.category-section').forEach(sec => {
+    if (sec.id === 'customSection') return;
+    const vis = Array.from(sec.querySelectorAll('.integration-card')).some(c => c.style.display !== 'none');
+    sec.style.display = vis ? '' : 'none';
+  });
+  document.getElementById('emptyState').style.display = anyVisible ? 'none' : 'block';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeCustomModal(); } });
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) { closeModal(); closeCustomModal(); } });
+});
+</script>
+{% endblock %}
