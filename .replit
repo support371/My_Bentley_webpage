@@ -24,12 +24,12 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uvicorn main:app --host 0.0.0.0 --port 3000"
-waitForPort = 3000
+args = "uvicorn main:app --host 0.0.0.0 --port 5000"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
 
 [[ports]]
-localPort = 3000
+localPort = 5000
 externalPort = 80

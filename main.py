@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -190,7 +190,7 @@ def verify_signature(payload: bytes, signature: str) -> bool:
 
 
 
-def get_safe_name(name: str | None, id_value: str | None, prefix: str) -> str:
+def get_safe_name(name: Optional[str], id_value: Optional[str], prefix: str) -> str:
     if name:
         return name
     if id_value:
