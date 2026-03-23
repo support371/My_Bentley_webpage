@@ -225,3 +225,37 @@ async def create_alert_rule(request: Request, session: AsyncSession = Depends(ge
     await session.commit()
     await session.refresh(rule)
     return {"id": rule.id, "name": rule.name}
+
+
+@router.delete("/admin/alert-rules/{rule_id}", tags=["Admin"])
+async def delete_alert_rule(rule_id: str, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(AlertRule).where(AlertRule.id == rule_id))
+    rule = result.scalars().first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    await session.delete(rule)
+    await session.commit()
+    return {"deleted": rule_id}
+
+
+@router.post("/admin/alert-rules/{rule_id}/toggle", tags=["Admin"])
+async def toggle_alert_rule(rule_id: str, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(AlertRule).where(AlertRule.id == rule_id))
+    rule = result.scalars().first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    rule.is_active = not rule.is_active
+    session.add(rule)
+    await session.commit()
+    return {"id": rule_id, "is_active": rule.is_active}
+
+
+@router.post("/admin/alerts/test-delivery", tags=["Admin"])
+async def test_alert_delivery(request: Request):
+    from app.services.alerts.engine import test_delivery
+    body = await request.json()
+    dest = body.get("destination", {})
+    if not dest.get("type"):
+        raise HTTPException(status_code=422, detail="destination.type is required")
+    result = await test_delivery(dest)
+    return result

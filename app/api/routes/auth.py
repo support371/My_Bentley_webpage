@@ -55,3 +55,96 @@ async def logout():
     response = RedirectResponse("/login")
     response.delete_cookie("access_token")
     return response
+
+
+# ── User Management API ────────────────────────────────────────────────────────
+
+@router.get("/api/users", tags=["Users"])
+async def list_users(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(
+        select(User).order_by(User.created_at.desc())
+    )
+    users = result.scalars().all()
+    return {
+        "users": [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.full_name,
+                "role": u.role,
+                "is_active": u.is_active,
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "created_at": u.created_at.isoformat(),
+            }
+            for u in users
+        ],
+        "total": len(users),
+    }
+
+
+@router.post("/api/users", tags=["Users"])
+async def create_user(request: Request, session: AsyncSession = Depends(get_session)):
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not email or not password:
+        raise HTTPException(status_code=422, detail="email and password are required")
+    existing = await session.execute(select(User).where(User.email == email))
+    if existing.scalars().first():
+        raise HTTPException(status_code=409, detail="A user with that email already exists")
+    user = User(
+        email=email,
+        hashed_password=hash_password(password),
+        full_name=body.get("full_name", ""),
+        role=body.get("role", "viewer"),
+        is_active=True,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return {"id": user.id, "email": user.email, "role": user.role}
+
+
+@router.put("/api/users/{user_id}", tags=["Users"])
+async def update_user(user_id: str, request: Request, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    body = await request.json()
+    if "full_name" in body:
+        user.full_name = body["full_name"]
+    if "role" in body and body["role"] in ("admin", "operator", "viewer"):
+        user.role = body["role"]
+    if "is_active" in body:
+        user.is_active = bool(body["is_active"])
+    session.add(user)
+    await session.commit()
+    return {"id": user.id, "email": user.email, "role": user.role, "is_active": user.is_active}
+
+
+@router.post("/api/users/{user_id}/reset-password", tags=["Users"])
+async def reset_password(user_id: str, request: Request, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    body = await request.json()
+    new_password = body.get("password", "")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=422, detail="Password must be at least 6 characters")
+    user.hashed_password = hash_password(new_password)
+    session.add(user)
+    await session.commit()
+    return {"ok": True, "message": f"Password reset for {user.email}"}
+
+
+@router.delete("/api/users/{user_id}", tags=["Users"])
+async def delete_user(user_id: str, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await session.delete(user)
+    await session.commit()
+    return {"deleted": user_id}

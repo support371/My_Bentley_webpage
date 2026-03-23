@@ -117,6 +117,52 @@ async def dashboard_feed(
     return payload
 
 
+@router.get("/api/charts/trend", tags=["Dashboard"])
+async def chart_trend(
+    timeRange: str = Query(default="24h"),
+    session: AsyncSession = Depends(get_session),
+):
+    from sqlalchemy import text
+    hours = HOURS_MAP.get(timeRange, 24)
+    since = datetime.utcnow() - timedelta(hours=hours)
+    now = datetime.utcnow()
+
+    if hours <= 2:
+        trunc_sql = "to_timestamp(floor(extract(epoch from received_at) / 300) * 300) AT TIME ZONE 'UTC'"
+        step = timedelta(minutes=5)
+        fmt = "%H:%M"
+    elif hours <= 168:
+        trunc_sql = "date_trunc('hour', received_at)"
+        step = timedelta(hours=1)
+        fmt = "%a %H:%M" if hours > 24 else "%H:%M"
+    else:
+        trunc_sql = "date_trunc('day', received_at)"
+        step = timedelta(days=1)
+        fmt = "%b %d"
+
+    result = await session.execute(
+        text(f"SELECT {trunc_sql} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket"),
+        {"since": since},
+    )
+    actual = {row[0].replace(tzinfo=None): int(row[1]) for row in result}
+
+    current = since.replace(second=0, microsecond=0)
+    if step == timedelta(minutes=5):
+        current = current.replace(minute=(current.minute // 5) * 5)
+    elif step == timedelta(hours=1):
+        current = current.replace(minute=0)
+    else:
+        current = current.replace(hour=0, minute=0)
+
+    labels, data = [], []
+    while current <= now:
+        labels.append(current.strftime(fmt))
+        data.append(actual.get(current, 0))
+        current += step
+
+    return {"labels": labels, "data": data, "timeRange": timeRange, "total": sum(data)}
+
+
 @router.get("/api/stats", tags=["Dashboard"])
 async def system_stats(session: AsyncSession = Depends(get_session)):
     from app.db.database import _app_start_time

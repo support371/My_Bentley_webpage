@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}iModel Explorer — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+.imodels-toolbar { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;
+  margin-bottom:1.25rem; }
+.imodels-search { flex:1; min-width:200px; max-width:320px; padding:.5rem .9rem;
+  border-radius:8px; border:1px solid var(--border); background:var(--bg-card);
+  color:var(--text-primary); font-size:.875rem; }
+.imodels-search:focus { outline:none; border-color:var(--primary); }
+.imodels-select { padding:.45rem .75rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg-card); color:var(--text-primary); font-size:.85rem; cursor:pointer; }
+.sort-btn { padding:.3rem .7rem; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg-card); cursor:pointer; font-size:.8rem; color:var(--text-muted); }
+.sort-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.event-count-pill { display:inline-block; padding:.1rem .5rem; border-radius:20px;
+  background:var(--primary-light); color:var(--primary); font-size:.7rem; font-weight:700; }
+.imodel-state-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:.35rem; }
+.imodel-state-dot.initialized { background:var(--green); animation:pulse 2s infinite; }
+.imodel-state-dot.notinitialized { background:var(--text-muted); }
+.imodel-state-dot.unknown { background:var(--orange); }
+.state-badge { display:inline-block; padding:.15rem .55rem; border-radius:12px;
+  font-size:.7rem; font-weight:600; background:var(--bg-secondary); color:var(--text-muted); }
+.state-badge.initialized { background:var(--green-bg); color:var(--green); }
+.state-badge.notinitialized { background:var(--bg-secondary); color:var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">iModel Explorer</h1>
+    <p class="page-subtitle">Digital models linked to iTwin projects</p>
+  </div>
+  <div class="page-actions">
+    <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+      <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()"> Live
+    </label>
+    <button class="btn btn-primary btn-sm" onclick="loadIModels()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="imodels-toolbar">
+  <input type="search" class="imodels-search" id="searchInput" placeholder="🔍  Search iModels…" oninput="filterCards()">
+  <select class="imodels-select" id="stateFilter" onchange="filterCards()">
+    <option value="">All States</option>
+  </select>
+  <div style="display:flex;gap:.4rem;">
+    <button class="sort-btn active" id="sortRecent" onclick="setSort('recent', this)">Recent</button>
+    <button class="sort-btn" id="sortName" onclick="setSort('name', this)">Name</button>
+    <button class="sort-btn" id="sortEvents" onclick="setSort('events', this)">Events</button>
+  </div>
+  <span class="text-muted text-sm" id="iModelCount">Loading…</span>
+</div>
+
+<div class="resource-grid" id="iModelsGrid">
+  <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted)">Loading iModels…</div>
+</div>
+
+<div id="emptyState" style="display:none;">
+  <div class="card">
+    <div class="empty-state large">
+      <div class="empty-icon">⬡</div>
+      <h3>No iModels discovered yet</h3>
+      <p>iModels appear here automatically as webhook events arrive referencing them.</p>
+      <button class="btn btn-primary" onclick="seedDemo()">Send Demo Events</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allIModels = [];
+let sortMode = 'recent';
+let autoInterval = null;
+
+async function loadIModels() {
+  try {
+    const res = await fetch('/api/imodels');
+    const d = await res.json();
+    allIModels = d.imodels || [];
+
+    const sel = document.getElementById('stateFilter');
+    const current = sel.value;
+    const existing = Array.from(sel.options).map(o => o.value);
+    (d.states || []).forEach(s => {
+      if (!existing.includes(s)) {
+        const opt = document.createElement('option');
+        opt.value = s; opt.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+        sel.appendChild(opt);
+      }
+    });
+    sel.value = current;
+    renderCards();
+  } catch(e) {
+    document.getElementById('iModelsGrid').innerHTML =
+      `<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:2rem">Error loading iModels: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const stateVal = document.getElementById('stateFilter').value;
+
+  let items = allIModels.filter(m => {
+    const matchQ = !q || (m.display_name||'').toLowerCase().includes(q) ||
+      (m.id||'').toLowerCase().includes(q) || (m.itwin_name||'').toLowerCase().includes(q);
+    const matchState = !stateVal || m.state === stateVal;
+    return matchQ && matchState;
+  });
+
+  if (sortMode === 'name') {
+    items.sort((a, b) => (a.display_name||a.id||'').localeCompare(b.display_name||b.id||''));
+  } else if (sortMode === 'events') {
+    items.sort((a, b) => (b.event_count||0) - (a.event_count||0));
+  }
+
+  document.getElementById('iModelCount').textContent =
+    `${items.length} iModel${items.length !== 1 ? 's' : ''}` +
+    (allIModels.length !== items.length ? ` of ${allIModels.length}` : '');
+
+  const grid = document.getElementById('iModelsGrid');
+  const empty = document.getElementById('emptyState');
+
+  if (allIModels.length === 0) {
+    grid.style.display = 'none'; empty.style.display = 'block'; return;
+  }
+  grid.style.display = ''; empty.style.display = 'none';
+
+  if (!items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted)">No iModels match your filters</div>`;
+    return;
+  }
+
+  const now = Date.now();
+  grid.innerHTML = items.map(m => {
+    const lastMs = m.last_event_at ? new Date(m.last_event_at).getTime() : 0;
+    const lastStr = lastMs ? timeAgo(new Date(m.last_event_at)) : 'Never';
+    const isActive = lastMs && (now - lastMs) < 3600000;
+    const state = m.state || 'unknown';
+    const stateSlug = state.toLowerCase().replace(/[^a-z]/g, '');
+    const name = esc(m.display_name || ('iModel-' + (m.id||'').slice(0,8)));
+    const iTwinName = esc(m.itwin_name || m.itwin_id || '—');
+    const shortId = (m.id||'').slice(0,16);
+    return `<div class="resource-card">
+      <div class="resource-card-header">
+        <span class="resource-icon">⬡</span>
+        <div class="resource-card-title" title="${name}">${name}</div>
+      </div>
+      <div class="resource-meta">
+        <div class="meta-row">
+          <span class="meta-label">State</span>
+          <span class="meta-val">
+            <span class="imodel-state-dot ${stateSlug}"></span>
+            <span class="state-badge ${stateSlug}">${esc(state)}</span>
+          </span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">ID</span>
+          <code class="meta-val text-sm" title="${esc(m.id)}">${esc(shortId)}${(m.id||'').length > 16 ? '…' : ''}</code>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">iTwin</span>
+          <span class="meta-val text-sm" title="${iTwinName}">${iTwinName.length > 20 ? iTwinName.slice(0,20) + '…' : iTwinName}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Events</span>
+          <span class="meta-val"><span class="event-count-pill">${m.event_count || 0}</span></span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Last Activity</span>
+          <span class="meta-val text-sm ${isActive ? '' : 'text-muted'}">${lastStr}</span>
+        </div>
+      </div>
+      <div class="resource-card-footer" style="display:flex;gap:.4rem;flex-wrap:wrap;">
+        <a href="/events-view?search=${encodeURIComponent(m.id)}" class="btn btn-ghost btn-xs">Events</a>
+        ${m.itwin_id ? `<a href="/itwins-view" class="btn btn-ghost btn-xs">iTwin</a>` : ''}
+        <button onclick="copyId('${esc(m.id)}')" class="btn btn-ghost btn-xs">Copy ID</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterCards() { renderCards(); }
+
+function setSort(mode, btn) {
+  sortMode = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCards();
+}
+
+function toggleAutoRefresh() {
+  const on = document.getElementById('autoRefreshToggle').checked;
+  if (on) { autoInterval = setInterval(loadIModels, 15000); }
+  else { clearInterval(autoInterval); }
+}
+
+function copyId(id) {
+  navigator.clipboard.writeText(id).then(() => {
+    window._showToast && window._showToast('ID copied to clipboard', 'success');
+  });
+}
+
+async function seedDemo() {
+  const r = await fetch('/api/events/demo?count=5', { method: 'POST' });
+  if (r.ok) { window._showToast && window._showToast('Demo events seeded', 'success'); setTimeout(loadIModels, 500); }
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function timeAgo(date) {
+  const secs = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
+  return `${Math.floor(secs/86400)}d ago`;
+}
+
+loadIModels();
+</script>
+{% endblock %}
