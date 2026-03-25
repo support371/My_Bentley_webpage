@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin Settings — {{ app_name }}{% endblock %}
+{% block title %}Admin — {{ app_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -14,46 +14,32 @@
 </div>
 
 <!-- System Stats Bar -->
-<div id="statsBar" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem;margin-bottom:1.5rem;">
   <div class="kpi-card" style="padding:.875rem;">
     <div class="kpi-icon kpi-blue" style="width:36px;height:36px;font-size:1.1rem;">◉</div>
-    <div class="kpi-body">
-      <div class="kpi-label">Total Events</div>
-      <div class="kpi-value" id="stat-events" style="font-size:1.4rem;">—</div>
-    </div>
+    <div class="kpi-body"><div class="kpi-label">Total Events</div><div class="kpi-value" id="stat-events" style="font-size:1.4rem;">—</div></div>
   </div>
   <div class="kpi-card" style="padding:.875rem;">
     <div class="kpi-icon kpi-purple" style="width:36px;height:36px;font-size:1.1rem;">◈</div>
-    <div class="kpi-body">
-      <div class="kpi-label">iTwins</div>
-      <div class="kpi-value" id="stat-itwins" style="font-size:1.4rem;">—</div>
-    </div>
+    <div class="kpi-body"><div class="kpi-label">iTwins</div><div class="kpi-value" id="stat-itwins" style="font-size:1.4rem;">—</div></div>
   </div>
   <div class="kpi-card" style="padding:.875rem;">
     <div class="kpi-icon kpi-teal" style="width:36px;height:36px;font-size:1.1rem;">⬡</div>
-    <div class="kpi-body">
-      <div class="kpi-label">iModels</div>
-      <div class="kpi-value" id="stat-imodels" style="font-size:1.4rem;">—</div>
-    </div>
+    <div class="kpi-body"><div class="kpi-label">iModels</div><div class="kpi-value" id="stat-imodels" style="font-size:1.4rem;">—</div></div>
   </div>
   <div class="kpi-card" style="padding:.875rem;">
     <div class="kpi-icon kpi-green" style="width:36px;height:36px;font-size:1rem;">🔌</div>
-    <div class="kpi-body">
-      <div class="kpi-label">Integrations</div>
-      <div class="kpi-value" id="stat-integrations" style="font-size:1.4rem;">—</div>
-    </div>
+    <div class="kpi-body"><div class="kpi-label">Integrations</div><div class="kpi-value" id="stat-integrations" style="font-size:1.4rem;">—</div></div>
   </div>
   <div class="kpi-card" style="padding:.875rem;">
     <div class="kpi-icon kpi-orange" style="width:36px;height:36px;font-size:1rem;">⏱</div>
-    <div class="kpi-body">
-      <div class="kpi-label">Uptime</div>
-      <div class="kpi-value" id="stat-uptime" style="font-size:1.1rem;">—</div>
-    </div>
+    <div class="kpi-body"><div class="kpi-label">Uptime</div><div class="kpi-value" id="stat-uptime" style="font-size:1.1rem;">—</div></div>
   </div>
 </div>
 
 <div class="admin-grid">
 
+  <!-- Bentley Connection -->
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
@@ -63,8 +49,8 @@
         </span>
       </div>
       {% if not bentley_configured %}
-      <div class="alert alert-info">
-        Set <code>BENTLEY_CLIENT_ID</code> and <code>BENTLEY_CLIENT_SECRET</code> in your environment to enable live Bentley API integration.
+      <div class="alert alert-info" style="margin-bottom:1rem;">
+        Set <code>BENTLEY_CLIENT_ID</code> and <code>BENTLEY_CLIENT_SECRET</code> in your environment variables to enable live Bentley API integration.
       </div>
       {% endif %}
       <div class="form-grid">
@@ -89,6 +75,7 @@
     </div>
   </div>
 
+  <!-- Webhook Endpoint -->
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
@@ -101,21 +88,23 @@
       </div>
       <div class="form-group mt-2">
         <label class="form-label">Webhook Secret (env: WEBHOOK_SECRET)</label>
-        <input type="text" class="form-input" placeholder="{{ 'Configured' if platform_info.WEBHOOK_SECRET_SET else 'Not set' }}" disabled />
+        <input type="text" class="form-input"
+          placeholder="{{ 'Configured' if platform_info.WEBHOOK_SECRET_SET else 'Not set — any caller can POST' }}" disabled />
       </div>
       <div class="action-row mt-2">
         <button class="btn btn-primary btn-sm" onclick="listBentleyWebhooks()">List Bentley Webhooks</button>
-        <button class="btn btn-ghost btn-sm" onclick="showCreateWebhookModal()">Register New →</button>
+        <button class="btn btn-ghost btn-sm" onclick="_showToast('Use POST /admin/webhooks/create — see API Docs','info')">Register New →</button>
       </div>
       <div id="webhooksResult" class="result-panel hidden"></div>
     </div>
   </div>
 
+  <!-- Alert Rules -->
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">Alert Rules</h2>
-        <button class="btn btn-primary btn-sm" onclick="showAlertRuleModal()">+ New Rule</button>
+        <button class="btn btn-primary btn-sm" onclick="showAlertModal()">+ New Rule</button>
       </div>
       <div id="alertRulesList">
         <div class="text-muted text-sm">Loading rules…</div>
@@ -123,24 +112,16 @@
     </div>
   </div>
 
+  <!-- Data Management -->
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">Data Management</h2>
       </div>
       <div class="info-list" style="margin-bottom:1rem;">
-        <div class="info-row">
-          <span>Deliveries</span>
-          <code id="dm-deliveries">—</code>
-        </div>
-        <div class="info-row">
-          <span>Processed OK</span>
-          <code id="dm-processed" style="color:var(--green)">—</code>
-        </div>
-        <div class="info-row">
-          <span>Errors</span>
-          <code id="dm-errors" style="color:var(--red)">—</code>
-        </div>
+        <div class="info-row"><span>Deliveries</span><code id="dm-deliveries">—</code></div>
+        <div class="info-row"><span>Processed OK</span><code id="dm-processed" style="color:var(--green)">—</code></div>
+        <div class="info-row"><span>Errors</span><code id="dm-errors" style="color:var(--red)">—</code></div>
       </div>
       <div class="form-group">
         <label class="form-label">Delete events older than</label>
@@ -155,13 +136,34 @@
             onclick="deleteOldEvents()">🗑 Purge</button>
         </div>
       </div>
-      <div style="margin-top:.75rem;">
+      <div style="margin-top:.75rem;display:flex;flex-wrap:wrap;gap:.4rem;">
         <button class="btn btn-ghost btn-sm" onclick="seedDemoEvents()">⚡ Seed 10 Demo Events</button>
         <a href="/events/export" target="_blank" class="btn btn-ghost btn-sm">📥 Export CSV</a>
       </div>
     </div>
   </div>
 
+  <!-- User Management -->
+  <div class="admin-section" style="grid-column:1/-1;">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">User Management</h2>
+        <button class="btn btn-primary btn-sm" onclick="showUserModal()">+ Invite User</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table sm">
+          <thead>
+            <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr><td colspan="6" class="empty-cell">Loading users…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Webhook Deliveries -->
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
@@ -169,9 +171,7 @@
       </div>
       <div class="table-wrap">
         <table class="data-table sm">
-          <thead>
-            <tr><th>Time</th><th>IP</th><th>Sig</th><th>Status</th></tr>
-          </thead>
+          <thead><tr><th>Time</th><th>IP</th><th>Sig</th><th>Status</th></tr></thead>
           <tbody>
             {% for d in recent_deliveries %}
             <tr>
@@ -196,27 +196,10 @@
     </div>
   </div>
 
+  <!-- Platform Info -->
   <div class="admin-section">
     <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">Recent Alerts</h2>
-      </div>
-      {% for a in recent_alerts %}
-      <div class="alert-item sev-{{ a.severity }}">
-        <strong>{{ a.title }}</strong>
-        <div class="text-sm text-muted">{{ a.triggered_at.strftime('%Y-%m-%d %H:%M') }}</div>
-      </div>
-      {% else %}
-      <div class="text-muted text-sm">No alerts triggered</div>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div class="admin-section">
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">Platform Info</h2>
-      </div>
+      <div class="card-header"><h2 class="card-title">Platform Info</h2></div>
       <div class="info-list">
         <div class="info-row"><span>Version</span><code>{{ platform_info.APP_VERSION }}</code></div>
         <div class="info-row"><span>Environment</span><code>{{ platform_info.ENVIRONMENT }}</code></div>
@@ -234,16 +217,17 @@
 
 </div>
 
-<div id="alertRuleModal" class="modal hidden">
+<!-- Alert Rule Modal -->
+<div id="alertModal" class="modal hidden">
   <div class="modal-backdrop" onclick="closeAlertModal()"></div>
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:520px;">
     <div class="modal-header">
       <h3>Create Alert Rule</h3>
       <button onclick="closeAlertModal()" class="modal-close">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label class="form-label">Rule Name</label>
+        <label class="form-label">Rule Name *</label>
         <input type="text" id="ruleNameInput" class="form-input" placeholder="e.g. iModel deleted alert" />
       </div>
       <div class="form-group">
@@ -259,15 +243,98 @@
         <input type="text" id="ruleValuesInput" class="form-input"
           placeholder="iModels.iModelDeleted.v1, accessControl.memberRemoved.v1" />
       </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
+      <p class="text-muted text-sm" style="margin-bottom:.75rem;">Notification Destination</p>
       <div class="form-group">
-        <label class="form-label">Notification Webhook URL (Slack, Discord, etc.)</label>
-        <input type="url" id="ruleSlackUrl" class="form-input" placeholder="https://hooks.slack.com/..." />
+        <label class="form-label">Type</label>
+        <select id="destType" class="form-select" onchange="updateDestFields()">
+          <option value="webhook">Generic Webhook</option>
+          <option value="slack">Slack</option>
+          <option value="discord">Discord</option>
+          <option value="email">Email</option>
+          <option value="pagerduty">PagerDuty</option>
+        </select>
+      </div>
+      <div class="form-group" id="destUrlGroup">
+        <label class="form-label" id="destUrlLabel">Webhook URL</label>
+        <input type="url" id="destUrl" class="form-input" placeholder="https://…" />
+      </div>
+      <div class="form-group hidden" id="destEmailGroup">
+        <label class="form-label">Email Address</label>
+        <input type="email" id="destEmail" class="form-input" placeholder="alerts@example.com" />
+      </div>
+      <div class="form-group hidden" id="destKeyGroup">
+        <label class="form-label" id="destKeyLabel">Routing Key / Token</label>
+        <input type="text" id="destKey" class="form-input" placeholder="r0f3…" />
       </div>
       <div class="action-row">
-        <button class="btn btn-primary" onclick="createAlertRule()">Create Rule</button>
-        <button class="btn btn-ghost" onclick="closeAlertModal()">Cancel</button>
-        <div id="ruleResult" class="inline-result"></div>
+        <button class="btn btn-primary btn-sm" onclick="testDestination()">⚡ Test delivery</button>
+        <div id="testResult" class="inline-result"></div>
       </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.9rem 1.4rem;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="closeAlertModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createAlertRule()">Create Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Modal -->
+<div id="userModal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeUserModal()"></div>
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h3 id="userModalTitle">Invite User</h3>
+      <button onclick="closeUserModal()" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editUserId" value="" />
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input type="email" id="userEmail" class="form-input" placeholder="user@example.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" id="userFullName" class="form-input" placeholder="Jane Doe" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select id="userRole" class="form-select">
+          <option value="viewer">Viewer</option>
+          <option value="operator">Operator</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group" id="userPwGroup">
+        <label class="form-label">Password *</label>
+        <input type="password" id="userPassword" class="form-input" placeholder="Min 6 characters" autocomplete="new-password" />
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.9rem 1.4rem;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="closeUserModal()">Cancel</button>
+      <button class="btn btn-primary" id="userSaveBtn" onclick="saveUser()">Invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="resetPwModal" class="modal hidden">
+  <div class="modal-backdrop" onclick="closeResetModal()"></div>
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-header">
+      <h3>Reset Password</h3>
+      <button onclick="closeResetModal()" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="resetUserId" value="" />
+      <div class="form-group">
+        <label class="form-label">New Password *</label>
+        <input type="password" id="resetPassword" class="form-input" placeholder="Min 6 characters" autocomplete="new-password" />
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.9rem 1.4rem;border-top:1px solid var(--border);">
+      <button class="btn btn-ghost" onclick="closeResetModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doResetPassword()">Reset</button>
     </div>
   </div>
 </div>
@@ -275,10 +342,15 @@
 
 {% block scripts %}
 <script>
+function _esc(s) {
+  if (!s) return '';
+  var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+/* ─── Stats ─── */
 async function loadStats() {
   try {
-    const r = await fetch('/api/stats');
-    const d = await r.json();
+    const d = await fetch('/api/stats').then(r=>r.json());
     document.getElementById('stat-events').textContent = d.total_events.toLocaleString();
     document.getElementById('stat-itwins').textContent = d.total_itwins.toLocaleString();
     document.getElementById('stat-imodels').textContent = d.total_imodels.toLocaleString();
@@ -290,43 +362,42 @@ async function loadStats() {
   } catch(e) {}
 }
 
+/* ─── Bentley ─── */
 async function testConnection() {
-  const result = document.getElementById('connectionResult');
-  result.textContent = '…testing';
+  const r = document.getElementById('connectionResult');
+  r.textContent = '…testing';
   const body = {};
   const cid = document.getElementById('bentleyClientId').value;
   const csec = document.getElementById('bentleyClientSecret').value;
   if (cid) body.client_id = cid;
   if (csec) body.client_secret = csec;
   try {
-    const res = await fetch('/admin/test-connection', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    result.textContent = d.connected ? '✓ Connected' : '✗ ' + (d.error || 'Failed');
-    result.className = 'inline-result ' + (d.connected ? 'ok' : 'err');
+    const d = await fetch('/admin/test-connection', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(r=>r.json());
+    r.textContent = d.connected ? '✓ Connected' : '✗ ' + (d.error||'Failed');
+    r.className = 'inline-result ' + (d.connected ? 'ok' : 'err');
     _showToast(d.connected ? 'Bentley connected' : 'Connection failed', d.connected ? 'success' : 'error');
-  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
+  } catch(e) { r.textContent = '✗ Error'; r.className = 'inline-result err'; }
 }
 
 async function fetchITwins() {
-  const result = document.getElementById('connectionResult');
-  result.textContent = '…fetching';
+  const r = document.getElementById('connectionResult');
+  r.textContent = '…fetching';
   const body = {};
   const cid = document.getElementById('bentleyClientId').value;
   const csec = document.getElementById('bentleyClientSecret').value;
   if (cid) body.client_id = cid;
   if (csec) body.client_secret = csec;
   try {
-    const res = await fetch('/admin/fetch-itwins', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
+    const d = await fetch('/admin/fetch-itwins', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(res=>res.json());
     if (d.count !== undefined) {
-      result.textContent = `✓ Found ${d.count} iTwins`;
-      result.className = 'inline-result ok';
+      r.textContent = `✓ Found ${d.count} iTwins`;
+      r.className = 'inline-result ok';
       _showToast(`Found ${d.count} iTwins`, 'success');
     } else {
-      result.textContent = '✗ ' + (d.detail || 'Failed');
-      result.className = 'inline-result err';
+      r.textContent = '✗ ' + (d.detail||'Failed');
+      r.className = 'inline-result err';
     }
-  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
+  } catch(e) { r.textContent = '✗ Error'; r.className = 'inline-result err'; }
 }
 
 async function listBentleyWebhooks() {
@@ -334,87 +405,227 @@ async function listBentleyWebhooks() {
   panel.classList.remove('hidden');
   panel.textContent = 'Loading…';
   try {
-    const res = await fetch('/admin/webhooks');
-    const d = await res.json();
+    const d = await fetch('/admin/webhooks').then(r=>r.json());
     if (d.webhooks) {
       panel.innerHTML = d.webhooks.length === 0
         ? '<em>No webhooks registered yet</em>'
         : '<ul>' + d.webhooks.map(w => `<li><code>${_esc(w.id)}</code> — ${_esc(w.callbackUrl||'')} (${w.isActive?'active':'inactive'})</li>`).join('') + '</ul>';
-    } else {
-      panel.textContent = 'Error: ' + (d.detail || 'Unknown error');
-    }
+    } else { panel.textContent = 'Error: ' + (d.detail||'Unknown error'); }
   } catch(e) { panel.textContent = 'Request failed: ' + e.message; }
 }
 
-function showCreateWebhookModal() {
-  _showToast('Use POST /admin/webhooks/create — see API Docs', 'info');
+/* ─── Alert Rules ─── */
+function showAlertModal() { document.getElementById('alertModal').classList.remove('hidden'); }
+function closeAlertModal() {
+  document.getElementById('alertModal').classList.add('hidden');
+  document.getElementById('testResult').textContent = '';
 }
 
-function showAlertRuleModal() { document.getElementById('alertRuleModal').classList.remove('hidden'); }
-function closeAlertModal() { document.getElementById('alertRuleModal').classList.add('hidden'); }
+function updateDestFields() {
+  const t = document.getElementById('destType').value;
+  document.getElementById('destUrlGroup').classList.toggle('hidden', t === 'email' || t === 'pagerduty');
+  document.getElementById('destEmailGroup').classList.toggle('hidden', t !== 'email');
+  document.getElementById('destKeyGroup').classList.toggle('hidden', t !== 'pagerduty');
+  const labels = {webhook:'Webhook URL', slack:'Slack Webhook URL', discord:'Discord Webhook URL'};
+  const el = document.getElementById('destUrlLabel');
+  if (el && labels[t]) el.textContent = labels[t];
+}
+
+function buildDestination() {
+  const t = document.getElementById('destType').value;
+  if (t === 'email') return {type:'email', to: document.getElementById('destEmail').value};
+  if (t === 'pagerduty') return {type:'pagerduty', routing_key: document.getElementById('destKey').value};
+  return {type: t, url: document.getElementById('destUrl').value};
+}
+
+async function testDestination() {
+  const r = document.getElementById('testResult');
+  r.textContent = '…testing';
+  const dest = buildDestination();
+  try {
+    const d = await fetch('/admin/alerts/test-delivery', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({destination:dest})}).then(r=>r.json());
+    r.textContent = d.ok ? '✓ Delivered' : '✗ ' + (d.error || 'Failed');
+    r.className = 'inline-result ' + (d.ok ? 'ok' : 'err');
+    _showToast(d.ok ? 'Test delivery succeeded' : 'Delivery failed: ' + (d.error||''), d.ok ? 'success' : 'error');
+  } catch(e) { r.textContent = '✗ Error'; r.className = 'inline-result err'; }
+}
 
 async function createAlertRule() {
-  const name = document.getElementById('ruleNameInput').value;
+  const name = document.getElementById('ruleNameInput').value.trim();
+  if (!name) { _showToast('Rule name is required', 'error'); return; }
   const type = document.getElementById('ruleTypeInput').value;
   const vals = document.getElementById('ruleValuesInput').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const slackUrl = document.getElementById('ruleSlackUrl').value;
-  const result = document.getElementById('ruleResult');
   const keyMap = {event_type_match:'event_types', category_match:'categories', severity_match:'severities'};
   const body = {
     name, rule_type: type,
     conditions: {[keyMap[type]]: vals},
-    destinations: slackUrl ? [{type:'slack', url:slackUrl}] : []
+    destinations: [buildDestination()].filter(d => d.url || d.to || d.routing_key)
   };
   try {
-    const res = await fetch('/admin/alert-rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const d = await res.json();
-    result.textContent = '✓ Created: ' + d.name;
-    result.className = 'inline-result ok';
+    const d = await fetch('/admin/alert-rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(r=>r.json());
     _showToast('Alert rule created: ' + _esc(d.name), 'success');
+    closeAlertModal();
     loadAlertRules();
-    setTimeout(closeAlertModal, 1500);
-  } catch(e) { result.textContent = '✗ Error'; result.className = 'inline-result err'; }
-}
-
-function _esc(s) {
-  if (!s) return '';
-  var d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+  } catch(e) { _showToast('Error creating rule', 'error'); }
 }
 
 async function loadAlertRules() {
   const el = document.getElementById('alertRulesList');
-  const res = await fetch('/admin/alert-rules');
-  const d = await res.json();
-  if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules configured yet</div>'; return; }
-  el.innerHTML = d.rules.map(r => `
-    <div class="alert-rule-item">
-      <div>
-        <strong>${_esc(r.name)}</strong>
-        <span class="badge badge-gray" style="margin-left:.4rem">${_esc(r.rule_type)}</span>
+  try {
+    const d = await fetch('/admin/alert-rules').then(r=>r.json());
+    if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules configured yet</div>'; return; }
+    el.innerHTML = d.rules.map(r => `
+      <div class="alert-rule-item" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--border);">
+        <div>
+          <strong>${_esc(r.name)}</strong>
+          <span class="badge badge-gray" style="margin-left:.4rem">${_esc(r.rule_type)}</span>
+        </div>
+        <div style="display:flex;gap:.4rem;align-items:center;">
+          <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Paused'}</span>
+          <button class="btn btn-ghost btn-xs" onclick="toggleRule('${r.id}')">${r.is_active ? 'Pause' : 'Resume'}</button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="deleteRule('${r.id}')">Delete</button>
+        </div>
       </div>
-      <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Muted'}</span>
-    </div>
-  `).join('');
+    `).join('');
+  } catch(e) { el.innerHTML = '<div class="text-muted text-sm" style="color:var(--red)">Error loading rules</div>'; }
 }
 
+async function toggleRule(id) {
+  await fetch(`/admin/alert-rules/${id}/toggle`, {method:'POST'});
+  loadAlertRules();
+}
+
+async function deleteRule(id) {
+  if (!confirm('Delete this alert rule?')) return;
+  await fetch(`/admin/alert-rules/${id}`, {method:'DELETE'});
+  _showToast('Alert rule deleted', 'warning');
+  loadAlertRules();
+}
+
+/* ─── Data Management ─── */
 async function deleteOldEvents() {
   const days = document.getElementById('deleteOlderDays').value;
   if (!confirm(`Delete all events older than ${days} days? This cannot be undone.`)) return;
-  const res = await fetch(`/api/events/old?days=${days}`, {method:'DELETE'});
-  const d = await res.json();
+  const d = await fetch(`/api/events/old?days=${days}`, {method:'DELETE'}).then(r=>r.json());
   _showToast(`Deleted ${d.deleted} events older than ${days} days`, d.deleted > 0 ? 'warning' : 'info');
   loadStats();
 }
 
 async function seedDemoEvents() {
-  const res = await fetch('/api/events/demo?count=10', {method:'POST'});
-  const d = await res.json();
+  const d = await fetch('/api/events/demo?count=10', {method:'POST'}).then(r=>r.json());
   _showToast(`Seeded ${d.seeded} demo events`, 'success');
   loadStats();
 }
 
-loadAlertRules();
+/* ─── User Management ─── */
+let _editMode = false;
+
+function showUserModal(userId, email, fullName, role) {
+  _editMode = !!userId;
+  document.getElementById('userModalTitle').textContent = _editMode ? 'Edit User' : 'Invite User';
+  document.getElementById('editUserId').value = userId || '';
+  document.getElementById('userEmail').value = email || '';
+  document.getElementById('userEmail').disabled = _editMode;
+  document.getElementById('userFullName').value = fullName || '';
+  document.getElementById('userRole').value = role || 'viewer';
+  document.getElementById('userPwGroup').classList.toggle('hidden', _editMode);
+  document.getElementById('userPassword').value = '';
+  document.getElementById('userSaveBtn').textContent = _editMode ? 'Save' : 'Invite';
+  document.getElementById('userModal').classList.remove('hidden');
+}
+function closeUserModal() { document.getElementById('userModal').classList.add('hidden'); }
+
+async function saveUser() {
+  const id = document.getElementById('editUserId').value;
+  const email = document.getElementById('userEmail').value.trim();
+  const fullName = document.getElementById('userFullName').value.trim();
+  const role = document.getElementById('userRole').value;
+  const password = document.getElementById('userPassword').value;
+
+  if (_editMode) {
+    await fetch(`/api/users/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({full_name:fullName, role})});
+    _showToast('User updated', 'success');
+  } else {
+    if (!email || !password) { _showToast('Email and password are required', 'error'); return; }
+    const res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email, full_name:fullName, role, password})});
+    if (!res.ok) { const d = await res.json(); _showToast(d.detail || 'Error creating user', 'error'); return; }
+    _showToast('User invited', 'success');
+  }
+  closeUserModal();
+  loadUsers();
+}
+
+async function toggleUserActive(id, active) {
+  await fetch(`/api/users/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({is_active:!active})});
+  _showToast(!active ? 'User enabled' : 'User disabled', 'info');
+  loadUsers();
+}
+
+function showResetModal(id) {
+  document.getElementById('resetUserId').value = id;
+  document.getElementById('resetPassword').value = '';
+  document.getElementById('resetPwModal').classList.remove('hidden');
+}
+function closeResetModal() { document.getElementById('resetPwModal').classList.add('hidden'); }
+
+async function doResetPassword() {
+  const id = document.getElementById('resetUserId').value;
+  const pw = document.getElementById('resetPassword').value;
+  if (pw.length < 6) { _showToast('Password must be at least 6 characters', 'error'); return; }
+  const res = await fetch(`/api/users/${id}/reset-password`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pw})});
+  if (res.ok) { _showToast('Password reset', 'success'); closeResetModal(); }
+  else { _showToast('Error resetting password', 'error'); }
+}
+
+async function deleteUser(id, email) {
+  if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
+  const res = await fetch(`/api/users/${id}`, {method:'DELETE'});
+  if (res.ok) { _showToast('User deleted', 'warning'); loadUsers(); }
+  else { const d = await res.json(); _showToast(d.detail || 'Error', 'error'); }
+}
+
+function roleColor(r) {
+  return {admin:'badge-red', operator:'badge-blue', viewer:'badge-gray'}[r] || 'badge-gray';
+}
+
+function timeAgo(iso) {
+  if (!iso) return 'Never';
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+async function loadUsers() {
+  const body = document.getElementById('userTableBody');
+  try {
+    const d = await fetch('/api/users').then(r=>r.json());
+    if (!d.users.length) { body.innerHTML = '<tr><td colspan="6" class="empty-cell">No users found</td></tr>'; return; }
+    body.innerHTML = d.users.map(u => `<tr>
+      <td><code style="font-size:.8rem">${_esc(u.email)}</code></td>
+      <td class="text-muted">${_esc(u.full_name || '—')}</td>
+      <td><span class="badge ${roleColor(u.role)}">${u.role}</span></td>
+      <td><span class="badge ${u.is_active ? 'badge-green' : 'badge-gray'}">${u.is_active ? 'Active' : 'Disabled'}</span></td>
+      <td class="text-muted text-sm">${timeAgo(u.last_login)}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-xs" onclick="showUserModal('${u.id}','${_esc(u.email)}','${_esc(u.full_name||'')}','${u.role}')">Edit</button>
+        <button class="btn btn-ghost btn-xs" onclick="showResetModal('${u.id}')">Reset PW</button>
+        <button class="btn btn-ghost btn-xs" onclick="toggleUserActive('${u.id}', ${u.is_active})">${u.is_active ? 'Disable' : 'Enable'}</button>
+        <button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="deleteUser('${u.id}','${_esc(u.email)}')">Delete</button>
+      </td>
+    </tr>`).join('');
+  } catch(e) { body.innerHTML = '<tr><td colspan="6" style="color:var(--red);padding:1rem">Error loading users</td></tr>'; }
+}
+
+/* ─── Init ─── */
 loadStats();
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAlertModal(); });
+loadAlertRules();
+loadUsers();
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAlertModal(); closeUserModal(); closeResetModal(); }
+});
 </script>
 {% endblock %}

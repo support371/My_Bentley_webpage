@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}iModel Explorer — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+.imodel-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:1rem; }
+.imodel-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius);
+  padding:1.1rem; transition:box-shadow .15s, border-color .15s; cursor:default; }
+.imodel-card:hover { box-shadow:var(--shadow-md); border-color:var(--primary-light); }
+.imodel-name { font-weight:700; font-size:1rem; margin-bottom:.2rem; color:var(--text); word-break:break-all; }
+.imodel-id  { font-size:.72rem; color:var(--text-muted); font-family:monospace; margin-bottom:.75rem; }
+.imodel-meta { display:flex; flex-direction:column; gap:.3rem; font-size:.82rem; }
+.imodel-row { display:flex; justify-content:space-between; align-items:center; }
+.imodel-row span:first-child { color:var(--text-muted); }
+.imodel-row span:last-child  { font-weight:600; }
+.state-badge { display:inline-flex; align-items:center; gap:.3rem; padding:.15rem .5rem;
+  border-radius:20px; font-size:.72rem; font-weight:600; }
+.state-ready        { background:var(--green-bg); color:var(--green); }
+.state-seedfile     { background:rgba(99,102,241,.12); color:#6366f1; }
+.state-notInitialized { background:var(--bg); color:var(--text-muted); border:1px solid var(--border); }
+.imodel-actions { margin-top:.85rem; display:flex; gap:.4rem; flex-wrap:wrap; }
+.count-chip { display:inline-flex; align-items:center; gap:.25rem; padding:.2rem .55rem;
+  border-radius:20px; font-size:.75rem; background:var(--primary-bg, rgba(59,130,246,.08));
+  color:var(--primary); font-weight:600; }
+.filter-bar-row { display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end; }
+@media(max-width:640px) { .imodel-grid { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">iModel Explorer</h1>
+    <p class="page-subtitle">Digital twin models and their event history</p>
+  </div>
+  <div class="page-actions">
+    <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
+      <input type="checkbox" id="liveToggle" onchange="toggleLive()"> Live
+    </label>
+    <button class="btn btn-primary btn-sm" onclick="loadIModels()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+  <div class="filter-bar-row">
+    <div class="filter-group" style="flex:1;min-width:200px;">
+      <label class="filter-label">Search</label>
+      <input type="text" id="searchInput" class="form-input sm" placeholder="Search iModels…"
+        oninput="debounceSearch()" />
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">State</label>
+      <select id="stateFilter" class="form-select sm" onchange="loadIModels()">
+        <option value="">All states</option>
+        <option value="ready">Ready</option>
+        <option value="seedFile">Seed File</option>
+        <option value="notInitialized">Not Initialized</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label class="filter-label">Sort</label>
+      <select id="sortSelect" class="form-select sm" onchange="loadIModels()">
+        <option value="recent">Recent Activity</option>
+        <option value="name">Name (A-Z)</option>
+        <option value="events">Most Events</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="card-header" style="margin-bottom:.75rem;">
+  <h2 class="card-title">iModels <span class="badge badge-gray" id="imodelCount">—</span></h2>
+  <span class="text-muted text-sm" id="imodelShown"></span>
+</div>
+
+<div id="imodelGrid" class="imodel-grid">
+  <div class="skeleton-card" style="height:180px;"></div>
+  <div class="skeleton-card" style="height:180px;"></div>
+  <div class="skeleton-card" style="height:180px;"></div>
+  <div class="skeleton-card" style="height:180px;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let liveInterval = null;
+let _debounceTimer = null;
+
+function debounceSearch() {
+  clearTimeout(_debounceTimer);
+  _debounceTimer = setTimeout(loadIModels, 350);
+}
+
+function toggleLive() {
+  const on = document.getElementById('liveToggle').checked;
+  if (on) liveInterval = setInterval(loadIModels, 10000);
+  else clearInterval(liveInterval);
+}
+
+function stateClass(s) {
+  if (!s) return 'state-ready';
+  if (s === 'ready') return 'state-ready';
+  if (s === 'seedFile') return 'state-seedfile';
+  return 'state-notInitialized';
+}
+
+function stateLabel(s) {
+  const m = {ready:'Ready', seedFile:'Seed File', notInitialized:'Not Initialized'};
+  return m[s] || s || 'Ready';
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div'); d.textContent = s; return d.innerHTML;
+}
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return diff + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+
+async function loadIModels() {
+  const search = document.getElementById('searchInput').value.trim();
+  const state  = document.getElementById('stateFilter').value;
+  const sort   = document.getElementById('sortSelect').value;
+  let url = `/api/imodels?sort=${sort}`;
+  if (search) url += '&search=' + encodeURIComponent(search);
+  if (state)  url += '&state=' + encodeURIComponent(state);
+
+  try {
+    const res = await fetch(url);
+    const d   = await res.json();
+    renderGrid(d);
+  } catch(e) {
+    document.getElementById('imodelGrid').innerHTML =
+      `<p style="color:var(--red);padding:1rem">Error loading iModels: ${e.message}</p>`;
+  }
+}
+
+function renderGrid(d) {
+  document.getElementById('imodelCount').textContent = d.total.toLocaleString();
+  document.getElementById('imodelShown').textContent =
+    d.shown < d.total ? `Showing ${d.shown} of ${d.total}` : '';
+
+  const grid = document.getElementById('imodelGrid');
+  if (!d.items || d.items.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;padding:2rem;text-align:center;">
+      <div style="font-size:2rem;margin-bottom:.5rem">⬡</div>
+      <div style="color:var(--text-muted)">No iModels found</div>
+      <div style="color:var(--text-muted);font-size:.85rem;margin-top:.25rem">Seed some demo events to get started</div>
+    </div>`;
+    return;
+  }
+
+  const sorted = d.sort === 'events'
+    ? [...d.items].sort((a,b) => b.event_count - a.event_count)
+    : d.items;
+
+  grid.innerHTML = d.items.map(m => {
+    const evtLink = m.itwin_id
+      ? `<a href="/events-view?itwin_id=${encodeURIComponent(m.itwin_id)}" class="btn btn-ghost btn-xs">Events</a>`
+      : '';
+    const iTwinLink = m.itwin_id
+      ? `<a href="/itwins-view" class="btn btn-ghost btn-xs">iTwin ↗</a>`
+      : '';
+    return `<div class="imodel-card">
+      <div class="imodel-name" title="${esc(m.id)}">${esc(m.display_name)}</div>
+      <div class="imodel-id">${esc(m.id.substring(0, 36))}</div>
+      <div class="imodel-meta">
+        <div class="imodel-row">
+          <span>State</span>
+          <span class="state-badge ${stateClass(m.state)}">${stateLabel(m.state)}</span>
+        </div>
+        <div class="imodel-row">
+          <span>Events</span>
+          <span class="count-chip">◉ ${m.event_count.toLocaleString()}</span>
+        </div>
+        ${m.itwin_name ? `<div class="imodel-row"><span>iTwin</span>
+          <span style="color:var(--primary);font-size:.8rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.itwin_name)}">${esc(m.itwin_name)}</span></div>` : ''}
+        <div class="imodel-row">
+          <span>Last activity</span>
+          <span style="color:var(--text-muted)">${timeAgo(m.last_event_at)}</span>
+        </div>
+      </div>
+      ${(evtLink || iTwinLink) ? `<div class="imodel-actions">${evtLink}${iTwinLink}
+        <button class="btn btn-ghost btn-xs" onclick="_copyText('${esc(m.id)}','iModel ID')">Copy ID</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+loadIModels();
+</script>
+{% endblock %}

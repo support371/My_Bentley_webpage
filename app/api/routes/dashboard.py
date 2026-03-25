@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 
 from app.db.database import get_session
 from app.core.security import get_optional_user
@@ -54,6 +54,10 @@ async def dashboard_feed(
     hours = HOURS_MAP.get(timeRange, 24)
     stats = await get_dashboard_stats(session, hours=hours)
 
+    total_events_alltime = await session.scalar(select(func.count(Event.id))) or 0
+    total_itwins = await session.scalar(select(func.count(ITwin.id))) or 0
+    total_imodels = await session.scalar(select(func.count(IModel.id))) or 0
+
     integrations_connected = await session.scalar(
         select(func.count(Integration.id)).where(Integration.status == "connected")
     ) or 0
@@ -64,21 +68,24 @@ async def dashboard_feed(
     ) or 0
     error_rate = round((error_count / total_webhooks * 100), 1) if total_webhooks else 0.0
 
-    total = stats["total_events"]
+    windowed_total = stats["total_events"]
     top_types = sorted(stats["type_counts"].items(), key=lambda x: -x[1])[:5]
 
-    if total > 0:
-        insight = f"Received {total} events in the last {timeRange}. "
-        if top_types:
-            insight += f"Most common: {top_types[0][0]} ({top_types[0][1]} occurrences). "
-        insight += f"Activity across {stats['unique_itwins']} iTwins and {stats['unique_imodels']} iModels."
+    if total_events_alltime > 0:
+        if windowed_total > 0:
+            insight = f"Received {windowed_total} events in the last {timeRange}. "
+            if top_types:
+                insight += f"Most common: {top_types[0][0]} ({top_types[0][1]} occurrences). "
+            insight += f"Activity across {stats['unique_itwins']} iTwins and {stats['unique_imodels']} iModels."
+        else:
+            insight = f"No events in the last {timeRange}. {total_events_alltime:,} total events on record."
         if integrations_connected:
             insight += f" {integrations_connected} integration(s) active."
     else:
-        insight = f"No events received in the last {timeRange}. System is idle and awaiting webhook events."
+        insight = "No events received yet. Use ⚡ Test Event to inject demo data."
 
-    health = "healthy" if total > 0 else "idle"
-    if total > 100:
+    health = "healthy" if windowed_total > 0 else ("idle" if total_events_alltime > 0 else "idle")
+    if windowed_total > 100:
         health = "busy"
 
     recent = []
@@ -99,9 +106,9 @@ async def dashboard_feed(
     payload = {
         "meta": {"timeRange": timeRange, "generatedAt": datetime.utcnow().isoformat(), "cached": False},
         "kpis": {
-            "totalEvents": total,
-            "uniqueITwins": stats["unique_itwins"],
-            "uniqueIModels": stats["unique_imodels"],
+            "totalEvents": total_events_alltime,
+            "uniqueITwins": total_itwins,
+            "uniqueIModels": total_imodels,
             "eventTypes": len(stats["type_counts"]),
             "integrationsConnected": integrations_connected,
             "errorRate": error_rate,
@@ -115,6 +122,56 @@ async def dashboard_feed(
 
     _feed_cache[cache_key] = {"ts": now, "data": payload}
     return payload
+
+
+@router.get("/api/charts/trend", tags=["Dashboard"])
+async def charts_trend(
+    timeRange: str = Query(default="7d"),
+    session: AsyncSession = Depends(get_session),
+):
+    hours = HOURS_MAP.get(timeRange, 168)
+    since = datetime.utcnow() - timedelta(hours=hours)
+
+    if hours <= 2:
+        bucket = "minute"
+        trunc = "date_trunc('minute', received_at)"
+    elif hours <= 72:
+        bucket = "hour"
+        trunc = "date_trunc('hour', received_at)"
+    else:
+        bucket = "day"
+        trunc = "date_trunc('day', received_at)"
+
+    q = text(f"SELECT {trunc} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket")
+    result = await session.execute(q, {"since": since})
+    rows = result.fetchall()
+
+    categories_result = await session.execute(
+        select(Event.event_category, func.count(Event.id).label("cnt"))
+        .where(Event.received_at >= since)
+        .group_by(Event.event_category)
+    )
+    cat_rows = categories_result.fetchall()
+
+    labels = []
+    counts = []
+    for row in rows:
+        dt = row.bucket
+        if bucket == "minute":
+            labels.append(dt.strftime("%H:%M"))
+        elif bucket == "hour":
+            labels.append(dt.strftime("%m/%d %H:00"))
+        else:
+            labels.append(dt.strftime("%m/%d"))
+        counts.append(int(row.cnt))
+
+    return {
+        "labels": labels,
+        "counts": counts,
+        "total": sum(counts),
+        "bucket": bucket,
+        "categories": {row.event_category: int(row.cnt) for row in cat_rows if row.event_category},
+    }
 
 
 @router.get("/api/stats", tags=["Dashboard"])

@@ -19,7 +19,7 @@ async def login_page(request: Request):
     token = request.cookies.get("access_token")
     if token:
         return RedirectResponse("/dashboard")
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    return templates.TemplateResponse("login.html", {"request": request, "error": None, "app_name": settings.APP_NAME})
 
 
 @router.post("/login", tags=["Auth"])
@@ -35,9 +35,21 @@ async def login(
     if not user or not verify_password(password, user.hashed_password):
         return templates.TemplateResponse(
             "login.html",
-            {"request": request, "error": "Invalid email or password"},
+            {"request": request, "error": "Invalid email or password", "app_name": settings.APP_NAME},
             status_code=401,
         )
+
+    if not user.is_active:
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Account is disabled. Contact your admin.", "app_name": settings.APP_NAME},
+            status_code=403,
+        )
+
+    from datetime import datetime
+    user.last_login = datetime.utcnow()
+    session.add(user)
+    await session.commit()
 
     token = create_token({"sub": user.id, "email": user.email, "role": user.role})
     response = RedirectResponse("/dashboard", status_code=302)
