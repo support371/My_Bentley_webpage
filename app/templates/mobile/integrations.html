@@ -1,0 +1,15 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile Catalog — {{ app_name }}{% endblock %}
+{% block mobile_title %}Catalog{% endblock %}
+{% block mobile_subtitle %}Mobile marketplace view for connected services and workflows.{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Catalog</h2>
+    <a class="mobile-action-link" href="/dashboard">Desktop view</a>
+  </div>
+  <div class="mobile-empty">Open the desktop catalog to manage connected services.</div>
+</section>
+{% endblock %}

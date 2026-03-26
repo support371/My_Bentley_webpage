@@ -1,0 +1,23 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile Admin — {{ app_name }}{% endblock %}
+{% block mobile_title %}Admin{% endblock %}
+{% block mobile_subtitle %}Compressed admin console for governance, user controls, Bentley setup, and operational oversight.{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Admin console</h2>
+    <a class="mobile-action-link" href="/admin">Desktop Admin</a>
+  </div>
+  <div id="adminGroups" class="mobile-admin-groups">
+    <div class="mobile-empty">Loading admin groups…</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initAdminPage();
+</script>
+{% endblock %}

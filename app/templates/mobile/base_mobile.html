@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="/static/css/mobile.css" />
+{% endblock %}
+
+{% block content %}
+<div class="mobile-shell" data-mobile-page="{{ active_mobile_tab }}">
+  <header class="mobile-header-card">
+    <div class="mobile-header-copy">
+      <div class="mobile-kicker">Bentley Mobile Ops</div>
+      <h1 class="mobile-title">{% block mobile_title %}Mobile Operations{% endblock %}</h1>
+      <p class="mobile-subtitle">{% block mobile_subtitle %}Operational control, alert visibility, and project monitoring in a mobile-first surface.{% endblock %}</p>
+    </div>
+    <div class="mobile-summary-strip" id="mobileSummaryStrip">
+      <div class="mobile-summary-chip"><span>Status</span><strong id="summaryHealth">Loading</strong></div>
+      <div class="mobile-summary-chip"><span>Alerts</span><strong id="summaryAlerts">—</strong></div>
+      <div class="mobile-summary-chip"><span>Integrations</span><strong id="summaryIntegrations">—</strong></div>
+      <div class="mobile-summary-chip"><span>Uptime</span><strong id="summaryUptime">—</strong></div>
+    </div>
+  </header>
+
+  <main class="mobile-page-body">
+    {% block mobile_body %}{% endblock %}
+  </main>
+
+  {% include "mobile/_bottom_nav.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="/static/js/mobile.js"></script>
+  {% block mobile_scripts %}{% endblock %}
+{% endblock %}

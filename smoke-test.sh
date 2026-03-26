@@ -16,13 +16,13 @@ test_endpoint() {
     local endpoint="$2"
     local expected="$3"
     local data="$4"
-    
+
     if [ "$method" = "GET" ]; then
         status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$endpoint")
     else
         status=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$data" "$BASE_URL$endpoint")
     fi
-    
+
     if [ "$status" = "$expected" ]; then
         echo "[PASS] $method $endpoint -> $status"
         PASS=$((PASS + 1))
@@ -42,6 +42,17 @@ test_endpoint "GET" "/events" "200"
 test_endpoint "GET" "/dashboard" "200"
 test_endpoint "GET" "/dashboard/feed" "200"
 test_endpoint "GET" "/dashboard/feed?timeRange=24h" "200"
+test_endpoint "GET" "/mobile/alarms" "200"
+test_endpoint "GET" "/mobile/monitors" "200"
+test_endpoint "GET" "/mobile/reports" "200"
+test_endpoint "GET" "/mobile/more" "200"
+test_endpoint "GET" "/mobile/integrations" "200"
+test_endpoint "GET" "/api/mobile/summary" "200"
+test_endpoint "GET" "/api/mobile/alarms" "200"
+test_endpoint "GET" "/api/mobile/monitors" "200"
+test_endpoint "GET" "/api/mobile/reports" "200"
+test_endpoint "GET" "/api/mobile/more-summary" "200"
+test_endpoint "GET" "/api/mobile/integrations" "200"
 
 echo ""
 echo "============================================"

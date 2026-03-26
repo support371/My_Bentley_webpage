@@ -1,0 +1,33 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile Alarms — {{ app_name }}{% endblock %}
+{% block mobile_title %}Alarms{% endblock %}
+{% block mobile_subtitle %}Event-driven operational alarms, ordered for mobile triage and executive visibility.{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Recent alarms</h2>
+    <button class="mobile-action-btn" onclick="window.MobileOps.refreshPage()">Refresh</button>
+  </div>
+  <div id="alarmsList" class="mobile-list-stack">
+    <div class="mobile-empty">Loading alarms…</div>
+  </div>
+</section>
+
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Escalation shortcuts</h2>
+  </div>
+  <div class="mobile-grid-2">
+    <a class="mobile-link-card" href="/events-view">Open Event Stream</a>
+    <a class="mobile-link-card" href="/integrations">Open Desktop Integrations</a>
+  </div>
+</section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initAlarmsPage();
+</script>
+{% endblock %}

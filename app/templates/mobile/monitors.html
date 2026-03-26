@@ -1,0 +1,49 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile Monitors — {{ app_name }}{% endblock %}
+{% block mobile_title %}Monitors{% endblock %}
+{% block mobile_subtitle %}Bootstrap external and Bentley-linked monitor flows from a mobile-friendly control surface.{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Setup monitoring</h2>
+  </div>
+  <form id="discoverMonitorForm" class="mobile-form-grid">
+    <label>
+      <span>Domain / URL</span>
+      <input type="url" name="url" placeholder="https://project.example.com" required>
+    </label>
+    <label>
+      <span>Label</span>
+      <input type="text" name="label" placeholder="Project external endpoint">
+    </label>
+    <label>
+      <span>Environment</span>
+      <select name="environment">
+        <option value="production">Production</option>
+        <option value="staging">Staging</option>
+        <option value="development">Development</option>
+      </select>
+    </label>
+    <button class="mobile-primary-btn" type="submit">Submit discovery</button>
+  </form>
+  <div id="monitorDiscoverResult" class="mobile-inline-result"></div>
+</section>
+
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Existing monitor surfaces</h2>
+    <a class="mobile-action-link" href="/itwins-view">View all</a>
+  </div>
+  <div id="monitorsList" class="mobile-list-stack">
+    <div class="mobile-empty">Loading monitors…</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initMonitorsPage();
+</script>
+{% endblock %}

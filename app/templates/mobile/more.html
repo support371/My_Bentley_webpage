@@ -1,0 +1,36 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile More — {{ app_name }}{% endblock %}
+{% block mobile_title %}More{% endblock %}
+{% block mobile_subtitle %}Account shortcuts, service status, alert testing, and lightweight preference management.{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Service and preferences</h2>
+  </div>
+  <div id="moreItems" class="mobile-list-stack">
+    <div class="mobile-empty">Loading service settings…</div>
+  </div>
+</section>
+
+<section class="mobile-card">
+  <div class="mobile-card-head"><h2>Quick actions</h2></div>
+  <div class="mobile-form-grid">
+    <label>
+      <span>Timezone</span>
+      <input type="text" id="mobileTimezoneInput" placeholder="America/New_York">
+    </label>
+    <button class="mobile-secondary-btn" type="button" onclick="window.MobileOps.saveTimezone()">Save timezone</button>
+    <button class="mobile-primary-btn" type="button" onclick="window.MobileOps.triggerTestAlert()">Trigger test alert</button>
+    <button class="mobile-secondary-btn" type="button" onclick="window.MobileOps.saveTabs()">Save tab customization</button>
+  </div>
+  <div id="moreActionResult" class="mobile-inline-result"></div>
+</section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initMorePage();
+</script>
+{% endblock %}
