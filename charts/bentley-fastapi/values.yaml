@@ -1,0 +1,69 @@
+replicaCount: 2
+
+image:
+  repository: bentley/my-bentley-webpage
+  tag: latest
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+  hosts:
+    - host: app.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: bentley-fastapi-tls
+      hosts:
+        - app.example.com
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75
+
+config:
+  environment: production
+  debug: "false"
+  publicBaseUrl: "https://app.example.com"
+  cookieSecure: "true"
+  initialAdminEmail: "admin@example.com"
+
+existingSecret: bentley-fastapi-secrets
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

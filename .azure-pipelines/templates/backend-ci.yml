@@ -1,0 +1,67 @@
+parameters:
+  - name: pythonVersion
+    type: string
+    default: '3.12'
+
+steps:
+  - task: UsePythonVersion@0
+    displayName: Use Python ${{ parameters.pythonVersion }}
+    inputs:
+      versionSpec: ${{ parameters.pythonVersion }}
+
+  - bash: |
+      set -euo pipefail
+      python -m pip install --upgrade pip wheel
+      pip install -r requirements.txt
+    displayName: Install dependencies
+
+  - bash: |
+      set -euo pipefail
+      python -m compileall app tests
+    displayName: Compile-check application
+
+  - bash: |
+      set -euo pipefail
+      mkdir -p test-results
+      if [ -d tests ]; then
+        pytest -q --junitxml=test-results/pytest.xml
+      else
+        echo "No tests directory found. Skipping pytest run."
+      fi
+    displayName: Run pytest
+
+  - task: PublishTestResults@2
+    displayName: Publish pytest results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'test-results/pytest.xml'
+      failTaskOnFailedTests: true
+      testRunTitle: 'Bentley FastAPI pytest'
+
+  - bash: |
+      set -euo pipefail
+      export BASE_URL="http://127.0.0.1:5000"
+      uvicorn app.main:app --host 127.0.0.1 --port 5000 > /tmp/bentley-fastapi.log 2>&1 &
+      APP_PID=$!
+      trap 'kill $APP_PID' EXIT
+      python - <<'PY'
+      import json
+      import time
+      import urllib.request
+
+      last_error = None
+      for _ in range(40):
+          try:
+              with urllib.request.urlopen("http://127.0.0.1:5000/health", timeout=3) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+                  print("Health:", payload)
+                  break
+          except Exception as exc:
+              last_error = exc
+              time.sleep(2)
+      else:
+          raise SystemExit(f"FastAPI app did not become healthy: {last_error}")
+      PY
+      bash smoke-test.sh
+    displayName: Run smoke test
