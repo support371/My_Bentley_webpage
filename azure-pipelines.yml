@@ -1,37 +1,40 @@
-# Python package
-# Create and test a Python package on multiple Python versions.
-# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+# Bentley iTwin Operations Center — Azure Pipelines CI
+# Runs unit tests and import check on every push to main.
+# Extend with a Deploy stage for AKS/Helm release.
 
 trigger:
-- main
+  branches:
+    include:
+      - main
 
 pool:
   vmImage: ubuntu-latest
 
-strategy:
-  matrix:
-    Python38:
-      python.version: '3.8'
-    Python39:
-      python.version: '3.9'
-    Python310:
-      python.version: '3.10'
-    Python311:
-      python.version: '3.11'
+variables:
+  pythonVersion: '3.12'
 
 steps:
 - task: UsePythonVersion@0
   inputs:
-    versionSpec: '$(python.version)'
-  displayName: 'Use Python $(python.version)'
+    versionSpec: $(pythonVersion)
+  displayName: 'Use Python $(pythonVersion)'
 
 - script: |
     python -m pip install --upgrade pip
     pip install -r requirements.txt
+    pip install pytest pytest-asyncio pytest-cov
   displayName: 'Install dependencies'
 
 - script: |
-    pip install pytest pytest-azurepipelines
-    pytest
-  displayName: 'pytest'
+    python -c "from app.main import app; print('Import OK')"
+  env:
+    DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
+    SECRET_KEY: ci-test-secret-key-min-32-characters-long
+  displayName: 'Smoke import check'
+
+- script: |
+    pytest tests/ -v --tb=short
+  env:
+    DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
+    SECRET_KEY: ci-test-secret-key-min-32-characters-long
+  displayName: 'Run tests'
