@@ -16,6 +16,7 @@ from app.models.auth import User
 from app.models.events import WebhookDelivery
 from app.services.bentley.client import test_connection, get_access_token, list_itwins, list_webhooks, create_webhook
 from app.services.bentley import diagnostics as diag
+from app.services.launch_readiness import get_launch_readiness
 from app.core.config import settings
 from app.core.security import hash_password
 
@@ -150,6 +151,24 @@ async def diagnostics_security_state():
         "env_check": env_check,
         "security_check": sec_check,
     }
+
+
+# ─── Launch Readiness ────────────────────────────────────────────────────────
+
+@router.get("/api/admin/launch-readiness", tags=["Admin"])
+async def launch_readiness_api(request: Request, user: dict = Depends(require_admin)):
+    return get_launch_readiness()
+
+
+@router.get("/admin/launch-readiness", response_class=HTMLResponse, tags=["Admin"])
+async def launch_readiness_page(request: Request, user: dict = Depends(require_admin)):
+    readiness = get_launch_readiness()
+    return templates.TemplateResponse("admin_launch_readiness.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "readiness": readiness,
+    })
 
 
 # ─── Bentley connection (original routes, hardened) ───────────────────────────
