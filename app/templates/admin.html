@@ -116,6 +116,25 @@
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
+        <h2 class="card-title">User Management</h2>
+        <button class="btn btn-primary btn-sm" onclick="showUserModal()">+ Invite User</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table sm" id="usersTable">
+          <thead>
+            <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
+          </thead>
+          <tbody id="usersBody">
+            <tr><td colspan="6" class="empty-cell text-muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <div class="card">
+      <div class="card-header">
         <h2 class="card-title">Data Management</h2>
       </div>
       <div class="info-list" style="margin-bottom:1rem;">
@@ -299,7 +318,7 @@
 </div>
 
 <!-- Alert Rule Modal -->
-<div id="alertModal" class="modal hidden">
+<div id="alertRuleModal" class="modal hidden">
   <div class="modal-backdrop" onclick="closeAlertModal()"></div>
   <div class="modal-box" style="max-width:520px;">
     <div class="modal-header">
@@ -323,34 +342,29 @@
         <label class="form-label">Match Values (comma-separated)</label>
         <input type="text" id="ruleValuesInput" class="form-input"
           placeholder="iModels.iModelDeleted.v1, accessControl.memberRemoved.v1" />
+        <div class="form-hint">For severity match: error, warning, info, success</div>
       </div>
-      <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0;" />
-      <p class="text-muted text-sm" style="margin-bottom:.75rem;">Notification Destination</p>
+      <hr style="border-color:var(--border);margin:1rem 0;">
       <div class="form-group">
-        <label class="form-label">Type</label>
-        <select id="destType" class="form-select" onchange="updateDestFields()">
-          <option value="webhook">Generic Webhook</option>
+        <label class="form-label">Notification Channel</label>
+        <select id="destTypeInput" class="form-select" onchange="updateDestFields()">
+          <option value="">— None (log only) —</option>
           <option value="slack">Slack</option>
           <option value="discord">Discord</option>
-          <option value="email">Email</option>
+          <option value="email">Email (SMTP)</option>
           <option value="pagerduty">PagerDuty</option>
+          <option value="webhook">Generic Webhook</option>
         </select>
       </div>
-      <div class="form-group" id="destUrlGroup">
-        <label class="form-label" id="destUrlLabel">Webhook URL</label>
-        <input type="url" id="destUrl" class="form-input" placeholder="https://…" />
+      <div id="destFields"></div>
+      <div id="testDeliveryRow" style="display:none;margin-top:.5rem;">
+        <button class="btn btn-ghost btn-sm" onclick="testDelivery()">⚡ Test delivery</button>
+        <span id="testDeliveryResult" style="font-size:.8rem;margin-left:.5rem;"></span>
       </div>
-      <div class="form-group hidden" id="destEmailGroup">
-        <label class="form-label">Email Address</label>
-        <input type="email" id="destEmail" class="form-input" placeholder="alerts@example.com" />
-      </div>
-      <div class="form-group hidden" id="destKeyGroup">
-        <label class="form-label" id="destKeyLabel">Routing Key / Token</label>
-        <input type="text" id="destKey" class="form-input" placeholder="r0f3…" />
-      </div>
-      <div class="action-row">
-        <button class="btn btn-primary btn-sm" onclick="testDestination()">⚡ Test delivery</button>
-        <div id="testResult" class="inline-result"></div>
+      <div class="action-row" style="margin-top:1.25rem;">
+        <button class="btn btn-primary" onclick="createAlertRule()">Create Rule</button>
+        <button class="btn btn-ghost" onclick="closeAlertModal()">Cancel</button>
+        <div id="ruleResult" class="inline-result"></div>
       </div>
     </div>
     <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:.9rem 1.4rem;border-top:1px solid var(--border);">
@@ -502,33 +516,62 @@ function closeAlertModal() {
   document.getElementById('testResult').textContent = '';
 }
 
+function showAlertRuleModal() {
+  document.getElementById('alertRuleModal').classList.remove('hidden');
+  document.getElementById('ruleNameInput').value = '';
+  document.getElementById('ruleValuesInput').value = '';
+  document.getElementById('destTypeInput').value = '';
+  document.getElementById('destFields').innerHTML = '';
+  document.getElementById('testDeliveryRow').style.display = 'none';
+  document.getElementById('ruleResult').textContent = '';
+}
+function closeAlertModal() { document.getElementById('alertRuleModal').classList.add('hidden'); }
+
 function updateDestFields() {
-  const t = document.getElementById('destType').value;
-  document.getElementById('destUrlGroup').classList.toggle('hidden', t === 'email' || t === 'pagerduty');
-  document.getElementById('destEmailGroup').classList.toggle('hidden', t !== 'email');
-  document.getElementById('destKeyGroup').classList.toggle('hidden', t !== 'pagerduty');
-  const labels = {webhook:'Webhook URL', slack:'Slack Webhook URL', discord:'Discord Webhook URL'};
-  const el = document.getElementById('destUrlLabel');
-  if (el && labels[t]) el.textContent = labels[t];
+  const type = document.getElementById('destTypeInput').value;
+  const container = document.getElementById('destFields');
+  const testRow = document.getElementById('testDeliveryRow');
+  document.getElementById('testDeliveryResult').textContent = '';
+  if (!type) { container.innerHTML = ''; testRow.style.display = 'none'; return; }
+  testRow.style.display = '';
+  const fields = {
+    slack:     `<div class="form-group"><label class="form-label">Slack Webhook URL</label><input type="url" id="destSlackUrl" class="form-input" placeholder="https://hooks.slack.com/services/..." /></div>`,
+    discord:   `<div class="form-group"><label class="form-label">Discord Webhook URL</label><input type="url" id="destDiscordUrl" class="form-input" placeholder="https://discord.com/api/webhooks/..." /></div>`,
+    pagerduty: `<div class="form-group"><label class="form-label">PagerDuty Routing Key</label><input type="text" id="destPdKey" class="form-input" placeholder="R0123456789abcdef..." /></div>`,
+    webhook:   `<div class="form-group"><label class="form-label">Webhook URL</label><input type="url" id="destWebhookUrl" class="form-input" placeholder="https://example.com/hook" /></div>`,
+    email: `
+      <div class="form-group"><label class="form-label">To Address</label><input type="email" id="destEmailTo" class="form-input" placeholder="ops@company.com" /></div>
+      <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" id="destSmtpHost" class="form-input" placeholder="smtp.gmail.com (or set ALERT_EMAIL_SMTP secret)" /></div>
+      <div class="form-group"><label class="form-label">SMTP Port</label><input type="number" id="destSmtpPort" class="form-input" value="587" /></div>
+      <div class="form-group"><label class="form-label">SMTP User</label><input type="text" id="destSmtpUser" class="form-input" placeholder="(or set ALERT_EMAIL_USER secret)" /></div>
+      <div class="form-group"><label class="form-label">SMTP Password</label><input type="password" id="destSmtpPass" class="form-input" placeholder="(or set ALERT_EMAIL_PASS secret)" /></div>`,
+  };
+  container.innerHTML = fields[type] || '';
 }
 
-function buildDestination() {
-  const t = document.getElementById('destType').value;
-  if (t === 'email') return {type:'email', to: document.getElementById('destEmail').value};
-  if (t === 'pagerduty') return {type:'pagerduty', routing_key: document.getElementById('destKey').value};
-  return {type: t, url: document.getElementById('destUrl').value};
+function _buildDestConfig() {
+  const type = document.getElementById('destTypeInput').value;
+  if (!type) return null;
+  const g = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  if (type === 'slack')     return {type, url: g('destSlackUrl')};
+  if (type === 'discord')   return {type, url: g('destDiscordUrl')};
+  if (type === 'pagerduty') return {type, routing_key: g('destPdKey')};
+  if (type === 'webhook')   return {type, url: g('destWebhookUrl')};
+  if (type === 'email')     return {type, to: g('destEmailTo'), smtp_host: g('destSmtpHost'), smtp_port: g('destSmtpPort')||587, smtp_user: g('destSmtpUser'), smtp_pass: g('destSmtpPass')};
+  return null;
 }
 
-async function testDestination() {
-  const r = document.getElementById('testResult');
-  r.textContent = '…testing';
-  const dest = buildDestination();
+async function testDelivery() {
+  const dest = _buildDestConfig();
+  const res = document.getElementById('testDeliveryResult');
+  if (!dest) { res.textContent = 'Configure destination first.'; return; }
+  res.textContent = '⏳ Sending…';
   try {
-    const d = await fetch('/admin/alerts/test-delivery', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({destination:dest})}).then(r=>r.json());
-    r.textContent = d.ok ? '✓ Delivered' : '✗ ' + (d.error || 'Failed');
-    r.className = 'inline-result ' + (d.ok ? 'ok' : 'err');
-    _showToast(d.ok ? 'Test delivery succeeded' : 'Delivery failed: ' + (d.error||''), d.ok ? 'success' : 'error');
-  } catch(e) { r.textContent = '✗ Error'; r.className = 'inline-result err'; }
+    const r = await fetch('/admin/alerts/test-delivery', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({destination: dest})});
+    const d = await r.json();
+    res.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    res.textContent = d.ok ? '✓ ' + d.message : '✗ ' + d.message;
+  } catch(e) { res.style.color='var(--red)'; res.textContent = '✗ ' + e.message; }
 }
 
 async function createAlertRule() {
@@ -536,11 +579,13 @@ async function createAlertRule() {
   if (!name) { _showToast('Rule name is required', 'error'); return; }
   const type = document.getElementById('ruleTypeInput').value;
   const vals = document.getElementById('ruleValuesInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const result = document.getElementById('ruleResult');
   const keyMap = {event_type_match:'event_types', category_match:'categories', severity_match:'severities'};
+  const dest = _buildDestConfig();
   const body = {
     name, rule_type: type,
     conditions: {[keyMap[type]]: vals},
-    destinations: [buildDestination()].filter(d => d.url || d.to || d.routing_key)
+    destinations: dest ? [dest] : []
   };
   try {
     const d = await fetch('/admin/alert-rules', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(r=>r.json());
@@ -550,21 +595,33 @@ async function createAlertRule() {
   } catch(e) { _showToast('Error creating rule', 'error'); }
 }
 
+async function deleteAlertRule(id, name) {
+  if (!confirm(`Delete rule "${name}"? This cannot be undone.`)) return;
+  const res = await fetch(`/admin/alert-rules/${id}`, {method:'DELETE'});
+  if (res.ok) { _showToast('Rule deleted: ' + name, 'warning'); loadAlertRules(); }
+}
+
+async function toggleAlertRule(id) {
+  const res = await fetch(`/admin/alert-rules/${id}/toggle`, {method:'POST'});
+  if (res.ok) { loadAlertRules(); }
+}
+
 async function loadAlertRules() {
   const el = document.getElementById('alertRulesList');
   try {
-    const d = await fetch('/admin/alert-rules').then(r=>r.json());
+    const res = await fetch('/admin/alert-rules');
+    const d = await res.json();
     if (!d.rules.length) { el.innerHTML = '<div class="text-muted text-sm">No alert rules configured yet</div>'; return; }
     el.innerHTML = d.rules.map(r => `
-      <div class="alert-rule-item" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--border);">
+      <div class="alert-rule-item" style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
         <div>
           <strong>${_esc(r.name)}</strong>
-          <span class="badge badge-gray" style="margin-left:.4rem">${_esc(r.rule_type)}</span>
+          <span class="badge badge-gray" style="margin-left:.4rem">${r.rule_type.replace(/_/g,' ')}</span>
         </div>
-        <div style="display:flex;gap:.4rem;align-items:center;">
+        <div style="display:flex;gap:.35rem;align-items:center;">
           <span class="badge ${r.is_active ? 'badge-green' : 'badge-gray'}">${r.is_active ? 'Active' : 'Paused'}</span>
-          <button class="btn btn-ghost btn-xs" onclick="toggleRule('${r.id}')">${r.is_active ? 'Pause' : 'Resume'}</button>
-          <button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="deleteRule('${r.id}')">Delete</button>
+          <button class="btn btn-ghost btn-xs" onclick="toggleAlertRule('${r.id}')">${r.is_active ? 'Pause' : 'Resume'}</button>
+          <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="deleteAlertRule('${r.id}','${r.name.replace(/'/g,"\\'")}')">Delete</button>
         </div>
       </div>
     `).join('');
@@ -718,12 +775,107 @@ async function quickTestOAuth() {
   }
 }
 
-/* ─── Init ─── */
-loadStats();
+/* ── User Management ─────────────────────────────────────── */
+let _editingUserId = null;
+
+function showUserModal(user = null) {
+  _editingUserId = user ? user.id : null;
+  document.getElementById('userModalTitle').textContent = user ? 'Edit User' : 'Invite User';
+  document.getElementById('userEmail').value = user ? user.email : '';
+  document.getElementById('userEmail').readOnly = !!user;
+  document.getElementById('userName').value = user ? (user.full_name || '') : '';
+  document.getElementById('userRole').value = user ? user.role : 'viewer';
+  document.getElementById('userPassword').value = '';
+  document.getElementById('userPasswordGroup').style.display = user ? 'none' : '';
+  document.getElementById('userSaveBtn').textContent = user ? 'Save Changes' : 'Create User';
+  document.getElementById('userResult').textContent = '';
+  document.getElementById('userModal').classList.remove('hidden');
+}
+function closeUserModal() { document.getElementById('userModal').classList.add('hidden'); }
+
+async function saveUser() {
+  const result = document.getElementById('userResult');
+  const body = {
+    email: document.getElementById('userEmail').value.trim(),
+    full_name: document.getElementById('userName').value.trim(),
+    role: document.getElementById('userRole').value,
+    password: document.getElementById('userPassword').value,
+  };
+  try {
+    let res;
+    if (_editingUserId) {
+      res = await fetch(`/api/users/${_editingUserId}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({full_name:body.full_name, role:body.role})});
+    } else {
+      res = await fetch('/api/users', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    }
+    const d = await res.json();
+    if (!res.ok) { result.textContent = '✗ ' + (d.detail || 'Error'); result.className = 'inline-result err'; return; }
+    result.textContent = '✓ ' + (_editingUserId ? 'Updated' : 'Created: ' + d.email);
+    result.className = 'inline-result ok';
+    _showToast(_editingUserId ? 'User updated' : 'User created: ' + d.email, 'success');
+    loadUsers();
+    setTimeout(closeUserModal, 1200);
+  } catch(e) { result.textContent = '✗ ' + e.message; result.className = 'inline-result err'; }
+}
+
+async function resetUserPassword(id, email) {
+  const pw = prompt(`New password for ${email} (min 6 chars):`);
+  if (!pw) return;
+  const res = await fetch(`/api/users/${id}/reset-password`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pw})});
+  const d = await res.json();
+  if (res.ok) { _showToast('Password reset for ' + email, 'success'); }
+  else { _showToast('Error: ' + (d.detail || 'Unknown'), 'error'); }
+}
+
+async function toggleUserActive(id, currentlyActive) {
+  const res = await fetch(`/api/users/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({is_active:!currentlyActive})});
+  if (res.ok) { _showToast('User ' + (currentlyActive ? 'deactivated' : 'activated'), 'info'); loadUsers(); }
+}
+
+async function deleteUser(id, email) {
+  if (!confirm(`Permanently delete user "${email}"?`)) return;
+  const res = await fetch(`/api/users/${id}`, {method:'DELETE'});
+  if (res.ok) { _showToast('User deleted: ' + email, 'warning'); loadUsers(); }
+}
+
+function _esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
+
+async function loadUsers() {
+  const body = document.getElementById('usersBody');
+  try {
+    const res = await fetch('/api/users');
+    const d = await res.json();
+    if (!d.users.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty-cell text-muted">No users yet</td></tr>';
+      return;
+    }
+    body.innerHTML = d.users.map(u => {
+      const lastLogin = u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never';
+      const roleColor = {admin:'badge-red', operator:'badge-blue', viewer:'badge-gray'}[u.role] || 'badge-gray';
+      return `<tr>
+        <td>${_esc(u.email)}</td>
+        <td class="text-muted">${_esc(u.full_name || '—')}</td>
+        <td><span class="badge ${roleColor}">${_esc(u.role)}</span></td>
+        <td><span class="badge ${u.is_active ? 'badge-green' : 'badge-gray'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td class="text-muted text-sm">${lastLogin}</td>
+        <td>
+          <div style="display:flex;gap:.25rem;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-xs" onclick='showUserModal(${JSON.stringify(u)})'>Edit</button>
+            <button class="btn btn-ghost btn-xs" onclick="resetUserPassword('${u.id}','${_esc(u.email)}')">⟳ PW</button>
+            <button class="btn btn-ghost btn-xs" onclick="toggleUserActive('${u.id}',${u.is_active})">${u.is_active ? 'Disable' : 'Enable'}</button>
+            <button class="btn btn-ghost btn-xs" style="color:var(--red)" onclick="deleteUser('${u.id}','${_esc(u.email)}')">Delete</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:var(--red)">Error loading users</td></tr>`;
+  }
+}
+
 loadAlertRules();
 loadUsers();
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeAlertModal(); closeUserModal(); closeResetModal(); }
-});
+loadStats();
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAlertModal(); closeUserModal(); } });
 </script>
 {% endblock %}

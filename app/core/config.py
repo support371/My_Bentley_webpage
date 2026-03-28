@@ -67,7 +67,12 @@ class Settings(BaseSettings):
     INITIAL_ADMIN_PASSWORD: str = Field(default="admin123", env="INITIAL_ADMIN_PASSWORD")
 
     ALERT_EMAIL_SMTP: Optional[str] = Field(default=None, env="ALERT_EMAIL_SMTP")
+    ALERT_EMAIL_PORT: int = Field(default=587, env="ALERT_EMAIL_PORT")
+    ALERT_EMAIL_USER: Optional[str] = Field(default=None, env="ALERT_EMAIL_USER")
+    ALERT_EMAIL_PASS: Optional[str] = Field(default=None, env="ALERT_EMAIL_PASS")
+    ALERT_EMAIL_FROM: Optional[str] = Field(default=None, env="ALERT_EMAIL_FROM")
     ALERT_SLACK_WEBHOOK: Optional[str] = Field(default=None, env="ALERT_SLACK_WEBHOOK")
+    ALERT_DISCORD_WEBHOOK: Optional[str] = Field(default=None, env="ALERT_DISCORD_WEBHOOK")
 
     MAX_EVENTS_IN_MEMORY: int = 1000
     RATE_LIMIT_PER_MINUTE: int = 60

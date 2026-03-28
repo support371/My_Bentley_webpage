@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request, Query
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -6,9 +7,9 @@ from sqlalchemy import select, func
 
 from app.db.database import get_session
 from app.core.security import get_optional_user
-from app.models.events import IModel, Event
-from app.models.resources import ITwin
 from app.core.config import settings
+from app.models.events import Event
+from app.models.resources import ITwin, IModel
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -26,27 +27,24 @@ async def imodels_view(request: Request):
 
 @router.get("/api/imodels", tags=["iModels"])
 async def list_imodels(
-    search: str = Query(default=""),
-    state: str = Query(default=""),
-    sort: str = Query(default="recent"),
-    limit: int = Query(default=200),
+    search: Optional[str] = None,
+    itwin_id: Optional[str] = None,
+    state: Optional[str] = None,
+    limit: int = Query(default=200, ge=1, le=1000),
     session: AsyncSession = Depends(get_session),
 ):
-    q = select(IModel)
+    query = select(IModel).order_by(IModel.last_event_at.desc().nullslast(), IModel.created_at.desc()).limit(limit)
+
     if search:
-        term = f"%{search}%"
-        from sqlalchemy import or_
-        q = q.where(or_(IModel.display_name.ilike(term), IModel.name.ilike(term)))
+        query = query.where(
+            IModel.display_name.ilike(f"%{search}%") | IModel.id.ilike(f"%{search}%")
+        )
+    if itwin_id:
+        query = query.where(IModel.itwin_id == itwin_id)
     if state:
-        q = q.where(IModel.state == state)
+        query = query.where(IModel.state == state)
 
-    if sort == "name":
-        q = q.order_by(IModel.display_name)
-    else:
-        q = q.order_by(IModel.last_event_at.desc().nullslast(), IModel.created_at.desc())
-
-    q = q.limit(limit)
-    result = await session.execute(q)
+    result = await session.execute(query)
     imodels = result.scalars().all()
 
     event_counts_result = await session.execute(
@@ -57,28 +55,30 @@ async def list_imodels(
     event_counts = {row.imodel_id: row.cnt for row in event_counts_result}
 
     itwin_ids = list({m.itwin_id for m in imodels if m.itwin_id})
-    itwin_names = {}
+    itwin_names: dict = {}
     if itwin_ids:
-        from sqlalchemy import or_
-        it_result = await session.execute(
+        tw_result = await session.execute(
             select(ITwin.id, ITwin.display_name).where(ITwin.id.in_(itwin_ids))
         )
-        itwin_names = {row.id: row.display_name for row in it_result}
+        itwin_names = {row.id: row.display_name for row in tw_result}
 
-    total = await session.scalar(select(func.count(IModel.id))) or 0
+    states = sorted({m.state for m in imodels if m.state})
 
-    items = []
-    for m in imodels:
-        items.append({
-            "id": m.id,
-            "display_name": m.display_name or m.name or m.id,
-            "name": m.name or "",
-            "state": m.state or "ready",
-            "itwin_id": m.itwin_id,
-            "itwin_name": itwin_names.get(m.itwin_id, ""),
-            "event_count": event_counts.get(m.id, 0),
-            "last_event_at": m.last_event_at.isoformat() if m.last_event_at else None,
-            "created_at": m.created_at.isoformat() if m.created_at else None,
-        })
-
-    return {"total": total, "shown": len(items), "items": items}
+    return {
+        "imodels": [
+            {
+                "id": m.id,
+                "display_name": m.display_name or m.name,
+                "name": m.name,
+                "state": m.state,
+                "itwin_id": m.itwin_id,
+                "itwin_name": itwin_names.get(m.itwin_id or "") or m.itwin_id,
+                "event_count": event_counts.get(m.id, 0),
+                "last_event_at": m.last_event_at.isoformat() if m.last_event_at else None,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in imodels
+        ],
+        "total": len(imodels),
+        "states": states,
+    }

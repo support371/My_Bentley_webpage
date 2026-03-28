@@ -196,6 +196,7 @@ code { font-family: 'SF Mono', 'Fira Code', Consolas, monospace; font-size: .85e
 /* ─── FORMS ──────────────────────────────────────────── */
 .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 1rem; }
 .form-label { font-size: .8rem; font-weight: 600; color: var(--text-muted); }
+.form-hint { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
 .form-input, .form-select {
   padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--bg-card); color: var(--text); font-size: .875rem;

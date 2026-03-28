@@ -270,33 +270,13 @@ async def toggle_alert_rule(rule_id: str, request: Request, user: dict = Depends
 
 @router.post("/admin/alerts/test-delivery", tags=["Admin"])
 async def test_alert_delivery(request: Request, user: dict = Depends(require_admin)):
+    from app.services.alerts.engine import test_delivery
     body = await request.json()
     dest = body.get("destination", {})
-    dtype = dest.get("type", "webhook")
-    import httpx
-    test_payload = {
-        "text": "✅ iTwin Ops Center — test delivery successful",
-        "event_type": "test.delivery",
-        "severity": "info",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    try:
-        if dtype in ("slack", "discord", "webhook"):
-            url = dest.get("url", "")
-            if not url:
-                return {"ok": False, "error": "No URL provided"}
-            async with httpx.AsyncClient(timeout=5) as client:
-                if dtype == "slack":
-                    r = await client.post(url, json={"text": test_payload["text"]})
-                elif dtype == "discord":
-                    r = await client.post(url, json={"content": test_payload["text"]})
-                else:
-                    r = await client.post(url, json=test_payload)
-            return {"ok": r.status_code < 400, "status": r.status_code}
-        else:
-            return {"ok": True, "message": f"Test for {dtype} noted (no external call needed)"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    if not dest.get("type"):
+        raise HTTPException(status_code=422, detail="destination.type is required")
+    result = await test_delivery(dest)
+    return result
 
 
 # ── User Management ───────────────────────────────────────────────────────────
