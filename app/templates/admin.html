@@ -112,26 +112,6 @@
     </div>
   </div>
 
-  <!-- Data Management -->
-  <div class="admin-section">
-    <div class="card">
-      <div class="card-header">
-        <h2 class="card-title">User Management</h2>
-        <button class="btn btn-primary btn-sm" onclick="showUserModal()">+ Invite User</button>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table sm" id="usersTable">
-          <thead>
-            <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
-          </thead>
-          <tbody id="usersBody">
-            <tr><td colspan="6" class="empty-cell text-muted">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
   <div class="admin-section">
     <div class="card">
       <div class="card-header">
@@ -174,7 +154,7 @@
           <thead>
             <tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr>
           </thead>
-          <tbody id="userTableBody">
+          <tbody id="usersBody">
             <tr><td colspan="6" class="empty-cell">Loading users…</td></tr>
           </tbody>
         </table>
@@ -312,6 +292,57 @@
         <a href="/api/docs" target="_blank" class="btn btn-ghost btn-sm">API Docs →</a>
         <a href="/health" target="_blank" class="btn btn-ghost btn-sm">Health →</a>
         <a href="/api/stats" target="_blank" class="btn btn-ghost btn-sm">Stats →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Configuration -->
+  <div class="admin-section" style="grid-column:1/-1;">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Service Configuration Readiness</h2>
+        <a href="/admin/launch-readiness" class="btn btn-ghost btn-sm">Full Checklist →</a>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem;">
+        <!-- Website Chat -->
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+            <span style="font-size:1.1rem;">💬</span>
+            <strong style="font-size:.85rem;">Website Chat</strong>
+            <span class="badge badge-gray" style="margin-left:auto;font-size:.7rem;">Planned</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:0;">Integrate a chat provider (Intercom, Crisp, Tawk.to) for user support and onboarding. Set <code>CHAT_PROVIDER_KEY</code> when ready.</p>
+        </div>
+        <!-- Browser Notifications -->
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+            <span style="font-size:1.1rem;">🔔</span>
+            <strong style="font-size:.85rem;">Browser Notifications</strong>
+            <span class="badge badge-gray" style="margin-left:auto;font-size:.7rem;">Planned</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:0;">Push notifications to operators via Web Push API. Requires a VAPID key pair. Add <code>VAPID_PUBLIC_KEY</code> / <code>VAPID_PRIVATE_KEY</code> to enable.</p>
+        </div>
+        <!-- Alert Delivery -->
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+            <span style="font-size:1.1rem;">🚨</span>
+            <strong style="font-size:.85rem;">Alert Delivery</strong>
+            <span class="badge {{ 'badge-green' if settings.ALERT_EMAIL_SMTP else 'badge-orange' }}" style="margin-left:auto;font-size:.7rem;">{{ 'Email ready' if settings.ALERT_EMAIL_SMTP else 'Email not set' }}</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:0;">
+            Multi-channel alerts: Slack, Discord, PagerDuty, Email, Webhook. Configure <code>ALERT_EMAIL_SMTP</code> for email delivery.
+            <a href="/admin#alertRules" style="color:var(--primary);">Manage rules →</a>
+          </p>
+        </div>
+        <!-- Observability -->
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem;">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;">
+            <span style="font-size:1.1rem;">📊</span>
+            <strong style="font-size:.85rem;">Observability</strong>
+            <span class="badge badge-gray" style="margin-left:auto;font-size:.7rem;">Planned</span>
+          </div>
+          <p style="font-size:.78rem;color:var(--text-muted);margin:0;">Error tracking and APM via Sentry or Datadog. Add <code>SENTRY_DSN</code> to enable automatic error capture and performance tracing.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -511,11 +542,7 @@ async function listBentleyWebhooks() {
 }
 
 /* ─── Alert Rules ─── */
-function showAlertModal() { document.getElementById('alertModal').classList.remove('hidden'); }
-function closeAlertModal() {
-  document.getElementById('alertModal').classList.add('hidden');
-  document.getElementById('testResult').textContent = '';
-}
+function showAlertModal() { showAlertRuleModal(); }
 
 function showAlertRuleModal() {
   document.getElementById('alertRuleModal').classList.remove('hidden');
