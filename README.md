@@ -21,7 +21,8 @@ A modular FastAPI platform for Bentley iTwin webhook operations, event intellige
 | Integrations | `/integrations` | 28-service integration catalog |
 | Mobile Ops | `/mobile` | Mobile-optimized ops view (alarms, monitors, reports) |
 | Admin | `/admin` | Alert rules, user management, Bentley diagnostics |
-| Admin Diagnostics | `/admin/diagnostics` | Deep Bentley readiness and security checks |
+| Launch Readiness | `/admin/launch-readiness` | Platform production checklist |
+| Control Plane | `/control-plane` | Enterprise execution layer (Website Studio, Infra) |
 
 ## API Endpoints
 
@@ -140,7 +141,9 @@ app/
 │   ├── imodels.py             # iModel explorer
 │   ├── integrations.py        # Integration catalog
 │   ├── itwins.py              # iTwin registry
+│   ├── launch_readiness.py    # Production readiness checks
 │   ├── mobile.py              # Mobile Ops pages + API
+│   ├── control_plane.py       # Enterprise control plane routes
 │   └── webhooks.py            # Webhook intake
 ├── services/
 │   ├── alerts/engine.py       # Multi-channel alert dispatch

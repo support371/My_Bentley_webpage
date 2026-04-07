@@ -103,6 +103,9 @@ async def dashboard_feed(
             "received_at": e.received_at.isoformat(),
         })
 
+    from app.services.launch_readiness import get_launch_readiness
+    readiness = get_launch_readiness()
+
     payload = {
         "meta": {"timeRange": timeRange, "generatedAt": datetime.utcnow().isoformat(), "cached": False},
         "kpis": {
@@ -118,10 +121,42 @@ async def dashboard_feed(
         "insights": insight,
         "eventTypeBreakdown": stats["type_counts"],
         "categoryBreakdown": stats["cat_counts"],
+        "systemStatus": {
+            "overall": readiness["overall"],
+            "checks": readiness["summary"]
+        }
     }
 
     _feed_cache[cache_key] = {"ts": now, "data": payload}
     return payload
+
+
+@router.post("/dashboard/test-webhook", tags=["Dashboard"])
+async def test_webhook_ingest(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    from app.services.event_processor import process_webhook_event
+    from app.models.events import WebhookDelivery
+    body = await request.body()
+    data = json.loads(body)
+
+    delivery = WebhookDelivery(
+        remote_ip=request.client.host if request.client else "127.0.0.1",
+        headers="{}",
+        raw_body=body.decode(),
+        signature_valid=True,
+        processing_status="received"
+    )
+    session.add(delivery)
+    await session.flush()
+
+    event = await process_webhook_event(body, {}, session)
+    delivery.event_id = event.id
+    delivery.processing_status = "processed"
+    await session.commit()
+
+    return {"status": "ok", "event_id": event.id}
 
 
 @router.get("/api/charts/trend", tags=["Dashboard"])
