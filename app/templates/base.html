@@ -37,6 +37,12 @@
     <a href="/admin" class="nav-link {% if request.url.path == '/admin' %}active{% endif %}">
       <span class="nav-icon">⚙</span><span class="nav-label">Admin</span>
     </a>
+    <a href="/admin/launch-readiness" class="nav-link {% if request.url.path == '/admin/launch-readiness' %}active{% endif %}">
+      <span class="nav-icon">🚀</span><span class="nav-label">Launch</span>
+    </a>
+    <a href="/control-plane" class="nav-link {% if request.url.path == '/control-plane' %}active{% endif %}">
+      <span class="nav-icon">🛰</span><span class="nav-label">Control</span>
+    </a>
   </div>
   <div class="navbar-end">
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◑</button>

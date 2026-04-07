@@ -438,14 +438,25 @@ function animNum(id, end) {
   requestAnimationFrame(step);
 }
 
-function updateHealth(health, insights) {
+function updateHealth(health, insights, systemStatus) {
   const dot = document.getElementById('healthDot');
   const text = document.getElementById('healthText');
   const pill = document.getElementById('healthPill');
   dot.className = 'health-dot health-' + health;
   text.textContent = health.charAt(0).toUpperCase() + health.slice(1);
   pill.className = 'health-pill health-pill-' + health;
-  document.getElementById('insightsBox').textContent = insights;
+
+  let insightHtml = `<div>${insights}</div>`;
+  if (systemStatus) {
+    const statusClass = systemStatus.overall === 'ready' ? 'text-success' : (systemStatus.overall === 'ready_with_warnings' ? 'text-warning' : 'text-danger');
+    insightHtml += `<div class="mt-2 pt-2 border-top small">
+      <span class="fw-bold">Platform Readiness:</span>
+      <span class="${statusClass}">${systemStatus.overall.replace(/_/g, ' ')}</span>
+      <span class="text-muted">(${systemStatus.checks.ok}/${systemStatus.checks.total} checks)</span>
+      <a href="/admin/launch-readiness" class="ms-2">Details →</a>
+    </div>`;
+  }
+  document.getElementById('insightsBox').innerHTML = insightHtml;
 }
 
 function updateEventsTable(events) {

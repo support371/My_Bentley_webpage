@@ -6,14 +6,15 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db.database import get_session
 from app.core.security import get_optional_user, require_admin
 from app.models.tenants import Tenant
 from app.models.resources import AlertRule, Alert
 from app.models.auth import User
-from app.models.events import WebhookDelivery
+from app.models.events import Event, WebhookDelivery
+from app.models.integrations import Integration
 from app.services.bentley.client import test_connection, get_access_token, list_itwins, list_webhooks, create_webhook
 from app.services.bentley import diagnostics as diag
 from app.services.launch_readiness import get_launch_readiness
@@ -75,6 +76,25 @@ async def admin_diagnostics_page(request: Request, session: AsyncSession = Depen
 
 
 # ─── Diagnostics API ─────────────────────────────────────────────────────────
+
+@router.get("/api/admin/summary", tags=["Admin"])
+async def admin_summary(session: AsyncSession = Depends(get_session)):
+    user_count = await session.scalar(select(func.count(User.id))) or 0
+    tenant_count = await session.scalar(select(func.count(Tenant.id))) or 0
+    event_count = await session.scalar(select(func.count(Event.id))) or 0
+    alert_count = await session.scalar(select(func.count(Alert.id))) or 0
+    integration_count = await session.scalar(select(func.count(Integration.id)).where(Integration.status == "connected")) or 0
+
+    return {
+        "users": user_count,
+        "tenants": tenant_count,
+        "total_events": event_count,
+        "active_alerts": alert_count,
+        "connected_integrations": integration_count,
+        "platform_version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT
+    }
+
 
 @router.get("/api/admin/diagnostics/summary", tags=["Admin Diagnostics"])
 async def diagnostics_summary(request: Request):

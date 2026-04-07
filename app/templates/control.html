@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Control Plane - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-2">Enterprise Control Plane</h1>
+            <p class="text-muted">Enterprise execution layer for website studio, infrastructure, marketplace, client delivery and environments.</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Dashboard Shortcuts -->
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center p-4">
+                    <div class="h1 mb-3">🌐</div>
+                    <h5>Website Studio</h5>
+                    <p class="small text-muted">Manage platform domains and content.</p>
+                    <a href="/control-plane/website-studio" class="btn btn-teal btn-sm">Launch Studio</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center p-4">
+                    <div class="h1 mb-3">🏗️</div>
+                    <h5>Infrastructure</h5>
+                    <p class="small text-muted">Cloud clusters and global resources.</p>
+                    <a href="/control-plane/infrastructure" class="btn btn-primary btn-sm">Open Console</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center p-4">
+                    <div class="h1 mb-3">🛒</div>
+                    <h5>Marketplace</h5>
+                    <p class="small text-muted">Partner solutions and news cards.</p>
+                    <button class="btn btn-secondary btn-sm" disabled>Coming Soon</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Control-plane modules -->
+        <div class="col-lg-7">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Platform Modules</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="list-group list-group-flush">
+                        {% for m in modules %}
+                        <div class="list-group-item px-0 py-3 border-light">
+                            <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                                <h6 class="mb-0">{{ m.name }}</h6>
+                                <span class="badge rounded-pill {% if m.status == 'Ready' %}bg-success{% elif m.status == 'In Progress' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {{ m.status }}
+                                </span>
+                            </div>
+                            <p class="text-muted small mb-0">{{ m.summary }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Environment stack -->
+        <div class="col-lg-5">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Environment Stack</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="list-group list-group-flush">
+                        {% for env in environments %}
+                        <a href="{{ env.path }}" class="list-group-item list-group-item-action px-0 py-3 border-light">
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <h6 class="mb-0">{{ env.name }}</h6>
+                                <span>→</span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.btn-teal { background-color: #14b8a6; color: white; }
+.btn-teal:hover { background-color: #0d9488; color: white; }
+</style>
+{% endblock %}
