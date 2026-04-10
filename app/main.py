@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -75,7 +76,6 @@ app.include_router(mobile.router)
 
 @app.get("/health", tags=["System"])
 async def health():
-    from datetime import datetime
     from app.db.database import AsyncSessionLocal
     from sqlalchemy import text
     db_ok = True
@@ -90,13 +90,17 @@ async def health():
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "database": "ok" if db_ok else "error",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         "bentley_configured": bool(settings.BENTLEY_CLIENT_ID),
     }
 
 
-@app.exception_handler(404)
-async def not_found(request: Request, exc):
-    if request.url.path.startswith("/api"):
-        return JSONResponse(status_code=404, content={"detail": "Not found"})
-    return RedirectResponse("/dashboard")
+
+
+# Custom 404 handler disabled - let FastAPI handle 404s natively
+# @app.exception_handler(404)
+# async def not_found(request: Request, exc):
+#     accept = request.headers.get("accept", "").lower()
+#     if request.url.path.startswith("/api") or "application/json" in accept:
+#         return JSONResponse(status_code=404, content={"detail": "Not found"})
+#     return RedirectResponse("/dashboard")

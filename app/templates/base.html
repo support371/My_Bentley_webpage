@@ -4,54 +4,149 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/app.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>" />
   {% block head %}{% endblock %}
 </head>
-<body>
+<body class="sidebar-layout">
 
-<nav class="navbar">
-  <a href="/dashboard" class="navbar-brand" style="text-decoration:none;color:inherit;">
-    <span class="brand-icon">⬡</span>
-    <span class="brand-name">iTwin Ops</span>
-  </a>
-  <div class="navbar-links">
-    <a href="/dashboard" class="nav-link {% if request.url.path == '/dashboard' %}active{% endif %}">
-      <span class="nav-icon">◈</span><span class="nav-label">Overview</span>
+{# Resolve active page from URL path #}
+{% set _p = request.url.path %}
+{% if _p == '/' or _p == '/dashboard' %}{% set _active = 'dashboard' %}
+{% elif _p.startswith('/events') %}{% set _active = 'events' %}
+{% elif _p.startswith('/itwins') %}{% set _active = 'itwins' %}
+{% elif _p.startswith('/integrations') %}{% set _active = 'integrations' %}
+{% elif _p.startswith('/webhooks') or _p == '/webhook' %}{% set _active = 'webhooks' %}
+{% elif _p.startswith('/admin') %}{% set _active = 'admin' %}
+{% else %}{% set _active = '' %}{% endif %}
+
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ─── SIDEBAR ──────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="sidebar-header">
+    <a href="/" class="sidebar-brand">
+      <span class="brand-icon">⬡</span>
+      <span class="brand-name">iTwin Ops</span>
     </a>
-    <a href="/events-view" class="nav-link {% if request.url.path == '/events-view' %}active{% endif %}">
-      <span class="nav-icon">◉</span><span class="nav-label">Events</span>
-    </a>
-    <a href="/itwins-view" class="nav-link {% if request.url.path == '/itwins-view' %}active{% endif %}">
-      <span class="nav-icon">◈</span><span class="nav-label">iTwins</span>
-    </a>
-    <a href="/imodels-view" class="nav-link {% if request.url.path == '/imodels-view' %}active{% endif %}">
-      <span class="nav-icon">⬡</span><span class="nav-label">iModels</span>
-    </a>
-    <a href="/integrations" class="nav-link {% if request.url.path == '/integrations' %}active{% endif %}">
-      <span class="nav-icon">🔌</span><span class="nav-label">Integrations</span>
-    </a>
-    <a href="/mobile/alarms" class="nav-link {% if request.url.path.startswith('/mobile') %}active{% endif %}">
-      <span class="nav-icon">📱</span><span class="nav-label">Mobile Ops</span>
-    </a>
-    <a href="/admin" class="nav-link {% if request.url.path == '/admin' %}active{% endif %}">
-      <span class="nav-icon">⚙</span><span class="nav-label">Admin</span>
-    </a>
+    <button class="sidebar-toggle-btn" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
   </div>
-  <div class="navbar-end">
-    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◑</button>
+
+  <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+
+    <a href="/" class="sidebar-link {% if _active == 'dashboard' %}active{% endif %}" title="Dashboard">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      <span class="sidebar-label">Dashboard</span>
+    </a>
+
+    <a href="/events" class="sidebar-link {% if _active == 'events' %}active{% endif %}" title="Event Stream">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span class="sidebar-label">Event Stream</span>
+    </a>
+
+    <a href="/itwins" class="sidebar-link {% if _active == 'itwins' %}active{% endif %}" title="iTwins Explorer">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+        <polyline points="2 17 12 22 22 17"/>
+        <polyline points="2 12 12 17 22 12"/>
+      </svg>
+      <span class="sidebar-label">iTwins</span>
+    </a>
+
+    <a href="/integrations" class="sidebar-link {% if _active == 'integrations' %}active{% endif %}" title="Integrations">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      </svg>
+      <span class="sidebar-label">Integrations</span>
+    </a>
+
+    <a href="/webhooks" class="sidebar-link {% if _active == 'webhooks' %}active{% endif %}" title="Webhooks">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/>
+        <path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06"/>
+        <path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8"/>
+      </svg>
+      <span class="sidebar-label">Webhooks</span>
+    </a>
+
+    {% if user and user.get('role') in ('admin', 'super_admin') %}
+    <div class="sidebar-divider"></div>
+    {% endif %}
+
+    <a href="/admin" class="sidebar-link {% if _active == 'admin' %}active{% endif %}" title="Admin">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07M8.46 15.54a5 5 0 0 1 0-7.07"/>
+      </svg>
+      <span class="sidebar-label">Admin</span>
+    </a>
+
+  </nav>
+
+  <div class="sidebar-footer">
     {% if user %}
-      <span class="user-chip" title="{{ user.email }}">{{ user.get('email','')[:20] }}</span>
-      <a href="/logout" class="btn-sm btn-ghost">Sign out</a>
+    <div class="sidebar-user">
+      <div class="user-avatar">{{ user.get('email', 'U')[0].upper() }}</div>
+      <div class="user-meta">
+        <span class="user-meta-email" title="{{ user.get('email', '') }}">{{ user.get('email', '')[:22] }}</span>
+        <span class="user-meta-role">{{ user.get('role', 'viewer') }}</span>
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">◑</button>
+      <a href="/logout" class="btn-sm btn-ghost" style="font-size:.75rem;">Sign out</a>
+    </div>
     {% else %}
-      <a href="/login" class="btn-sm btn-primary">Sign in</a>
+    <a href="/login" class="sidebar-link">
+      <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      <span class="sidebar-label">Sign in</span>
+    </a>
     {% endif %}
   </div>
-</nav>
 
-<div class="page-container">
-  {% block content %}{% endblock %}
+</aside>
+<!-- ─── END SIDEBAR ───────────────────────────────────────── -->
+
+<!-- ─── MAIN CONTENT ─────────────────────────────────────── -->
+<div class="main-wrap" id="mainWrap">
+
+  <header class="topbar">
+    <button class="topbar-menu-btn" onclick="openSidebar()" title="Open menu" aria-label="Open navigation">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <span class="topbar-title">{% block page_title %}{{ app_name }}{% endblock %}</span>
+    <div class="topbar-end">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" style="display:none;" id="topbarTheme">◑</button>
+    </div>
+  </header>
+
+  <main class="page-content" role="main">
+    {% block content %}{% endblock %}
+  </main>
+
 </div>
+<!-- ─── END MAIN CONTENT ──────────────────────────────────── -->
 
 <div id="toastContainer" style="
   position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;

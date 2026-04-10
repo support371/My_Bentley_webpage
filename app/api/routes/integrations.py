@@ -18,6 +18,12 @@ templates = Jinja2Templates(directory="app/templates")
 logger = logging.getLogger("itwin_ops.integrations")
 
 INTEGRATION_CATALOG = [
+    # ── FIRST-CLASS: Azure DevOps ─────────────────────────────────────────────
+    {"slug": "azure-devops", "name": "Azure DevOps", "category": "CI/CD", "icon_emoji": "🔷",
+     "icon_color": "#0078d4", "featured": True,
+     "description": "First-class integration — connect Boards, Pipelines, Repos, and Artifacts to iTwin event triggers.",
+     "docs_url": "https://learn.microsoft.com/en-us/rest/api/azure/devops/"},
+    # ─────────────────────────────────────────────────────────────────────────
     {"slug": "github", "name": "GitHub", "category": "Source Control", "icon_emoji": "🐙",
      "icon_color": "#24292f", "description": "Connect repositories, automate workflows, and sync code events.", "docs_url": "https://docs.github.com/en/rest"},
     {"slug": "gitlab", "name": "GitLab", "category": "Source Control", "icon_emoji": "🦊",
@@ -75,8 +81,8 @@ INTEGRATION_CATALOG = [
 ]
 
 CATEGORIES_ORDER = [
-    "Source Control", "Cloud & Deploy", "AI & LLM", "Dev Tools",
-    "CI/CD", "Community", "Notifications", "Project Mgmt", "Observability"
+    "CI/CD", "Source Control", "Cloud & Deploy", "AI & LLM", "Dev Tools",
+    "Community", "Notifications", "Project Mgmt", "Observability"
 ]
 
 

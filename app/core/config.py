@@ -1,22 +1,24 @@
 import os
 import logging
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import ConfigDict
 from typing import Optional
 
 logger = logging.getLogger("itwin_ops.config")
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+
     APP_NAME: str = "Bentley iTwin Operations Center"
     APP_VERSION: str = "2.0.0"
-    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    DEBUG: bool = Field(default=True, env="DEBUG")
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
 
     HOST: str = "0.0.0.0"
-    PORT: int = Field(default=5000, env="PORT")
+    PORT: int = 5000
 
-    DATABASE_URL: str = Field(default="sqlite+aiosqlite:///./itwin_ops.db", env="DATABASE_URL")
+    DATABASE_URL: str = "sqlite+aiosqlite:///./itwin_ops.db"
 
     @property
     def ASYNC_DATABASE_URL(self) -> str:
@@ -43,38 +45,31 @@ class Settings(BaseSettings):
             return False
         return self.DB_IS_POSTGRES
 
-    SECRET_KEY: str = Field(default="dev-secret-key-change-in-production-min-32-chars", env="SECRET_KEY")
+    SECRET_KEY: str = "dev-secret-key-change-in-production-min-32-chars"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 8
 
-    COOKIE_SECURE: bool = Field(default=False, env="COOKIE_SECURE")
+    COOKIE_SECURE: bool = False
 
-    WEBHOOK_SECRET: str = Field(default="", env="WEBHOOK_SECRET")
-    SKIP_SIGNATURE_VERIFY: bool = Field(default=True, env="SKIP_SIGNATURE_VERIFY")
+    WEBHOOK_SECRET: str = ""
+    SKIP_SIGNATURE_VERIFY: bool = True
 
-    BENTLEY_CLIENT_ID: Optional[str] = Field(default=None, env="BENTLEY_CLIENT_ID")
-    BENTLEY_CLIENT_SECRET: Optional[str] = Field(default=None, env="BENTLEY_CLIENT_SECRET")
-    BENTLEY_AUTHORITY: str = Field(default="https://ims.bentley.com", env="BENTLEY_AUTHORITY")
-    BENTLEY_API_BASE: str = Field(default="https://api.bentley.com", env="BENTLEY_API_BASE")
-    BENTLEY_SCOPE: str = Field(
-        default="itwins:read imodels:read webhooks:read webhooks:modify",
-        env="BENTLEY_SCOPE",
-    )
+    BENTLEY_CLIENT_ID: Optional[str] = None
+    BENTLEY_CLIENT_SECRET: Optional[str] = None
+    BENTLEY_AUTHORITY: str = "https://ims.bentley.com"
+    BENTLEY_API_BASE: str = "https://api.bentley.com"
+    BENTLEY_SCOPE: str = "itwins:read imodels:read webhooks:read webhooks:modify"
 
-    PUBLIC_BASE_URL: Optional[str] = Field(default=None, env="PUBLIC_BASE_URL")
+    PUBLIC_BASE_URL: Optional[str] = None
 
-    INITIAL_ADMIN_EMAIL: str = Field(default="admin@example.com", env="INITIAL_ADMIN_EMAIL")
-    INITIAL_ADMIN_PASSWORD: str = Field(default="admin123", env="INITIAL_ADMIN_PASSWORD")
+    INITIAL_ADMIN_EMAIL: str = "admin@example.com"
+    INITIAL_ADMIN_PASSWORD: str = "admin123"
 
-    ALERT_EMAIL_SMTP: Optional[str] = Field(default=None, env="ALERT_EMAIL_SMTP")
-    ALERT_SLACK_WEBHOOK: Optional[str] = Field(default=None, env="ALERT_SLACK_WEBHOOK")
+    ALERT_EMAIL_SMTP: Optional[str] = None
+    ALERT_SLACK_WEBHOOK: Optional[str] = None
 
     MAX_EVENTS_IN_MEMORY: int = 1000
     RATE_LIMIT_PER_MINUTE: int = 60
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
 
 
 settings = Settings()
