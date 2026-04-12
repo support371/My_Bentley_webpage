@@ -2,7 +2,8 @@ import hmac
 import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -35,8 +36,9 @@ def create_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
 
 def decode_token(token: str) -> Optional[dict]:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError:
+        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM],
+                          options={"require": ["exp", "sub"]})
+    except (JWTError, KeyError):
         return None
 
 
