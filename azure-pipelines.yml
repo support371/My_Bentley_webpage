@@ -1,7 +1,3 @@
-# Bentley iTwin Operations Center — Azure Pipelines CI
-# Runs unit tests and import check on every push to main.
-# Extend with a Deploy stage for AKS/Helm release.
-
 trigger:
   branches:
     include:
@@ -11,6 +7,79 @@ pool:
   vmImage: ubuntu-latest
 
 variables:
+  PYTHON_VERSION: '3.12'
+  IMAGE_NAME: bentley-itwin-ops
+  DOCKER_REGISTRY: '$(dockerRegistryServiceConnection)'
+
+stages:
+
+# ─── Stage 1: Test ───────────────────────────────────────────────────────────
+- stage: Test
+  displayName: 'Test'
+  jobs:
+  - job: PyTest
+    displayName: 'Run pytest (Python 3.12)'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(PYTHON_VERSION)'
+      displayName: 'Use Python $(PYTHON_VERSION)'
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install dependencies'
+
+    - script: |
+        pytest test_main.py tests/ -v --tb=short \
+          --junitxml=test-results.xml
+      displayName: 'Run tests'
+      env:
+        ENVIRONMENT: test
+        DATABASE_URL: sqlite+aiosqlite:///:memory:
+        SKIP_SIGNATURE_VERIFY: 'true'
+
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+        testResultsFiles: 'test-results.xml'
+        testRunTitle: 'Python $(PYTHON_VERSION) Tests'
+
+# ─── Stage 2: Docker Build ───────────────────────────────────────────────────
+- stage: Build
+  displayName: 'Build & Push Docker Image'
+  dependsOn: Test
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: DockerBuild
+    displayName: 'Build and push image'
+    steps:
+    - task: Docker@2
+      displayName: 'Build and push to registry'
+      inputs:
+        command: buildAndPush
+        repository: '$(IMAGE_NAME)'
+        dockerfile: 'Dockerfile'
+        containerRegistry: '$(DOCKER_REGISTRY)'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+# ─── Stage 3: Deploy to Staging ──────────────────────────────────────────────
+- stage: DeployStaging
+  displayName: 'Deploy to Staging'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployStaging
+    displayName: 'Deploy staging'
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Wire up your staging deploy step here (Azure Web App, AKS, etc.)"
+            displayName: 'Staging deploy placeholder'
   pythonVersion: '3.12'
 
 steps:

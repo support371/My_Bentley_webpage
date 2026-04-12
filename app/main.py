@@ -3,6 +3,7 @@ import time
 import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
@@ -111,7 +112,6 @@ app.include_router(agent.router)
 
 @app.get("/health", tags=["System"])
 async def health():
-    from datetime import datetime
     from app.db.database import AsyncSessionLocal
     from sqlalchemy import text
     db_ok = True
@@ -126,64 +126,17 @@ async def health():
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "database": "ok" if db_ok else "error",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         "bentley_configured": bool(settings.BENTLEY_CLIENT_ID),
     }
 
 
-def _error_response(request: Request, code: int, title: str, message: str, detail: str = ""):
-    if request.url.path.startswith("/api"):
-        return JSONResponse(status_code=code, content={"detail": message})
-    try:
-        return templates.TemplateResponse(
-            "error.html",
-            {
-                "request": request,
-                "app_name": settings.APP_NAME,
-                "code": code,
-                "title": title,
-                "message": message,
-                "detail": detail,
-            },
-            status_code=code,
-        )
-    except Exception:
-        return HTMLResponse(f"<h1>{code} — {title}</h1><p>{message}</p>", status_code=code)
 
 
-@app.exception_handler(404)
-async def not_found(request: Request, exc):
-    return _error_response(
-        request, 404,
-        "Page Not Found",
-        f"The page at {request.url.path} doesn't exist. It may have been moved or the URL is incorrect.",
-    )
-
-
-@app.exception_handler(403)
-async def forbidden(request: Request, exc):
-    return _error_response(
-        request, 403,
-        "Access Forbidden",
-        "You don't have permission to access this resource.",
-    )
-
-
-@app.exception_handler(500)
-async def server_error(request: Request, exc):
-    logger.error(f"500 on {request.url.path}: {exc}")
-    return _error_response(
-        request, 500,
-        "Internal Server Error",
-        "Something went wrong on our end. The error has been logged. Please try again in a moment.",
-        detail=str(exc),
-    )
-
-
-@app.exception_handler(429)
-async def too_many_requests(request: Request, exc):
-    return _error_response(
-        request, 429,
-        "Too Many Requests",
-        f"Rate limit exceeded. Please wait a moment before trying again.",
-    )
+# Custom 404 handler disabled - let FastAPI handle 404s natively
+# @app.exception_handler(404)
+# async def not_found(request: Request, exc):
+#     accept = request.headers.get("accept", "").lower()
+#     if request.url.path.startswith("/api") or "application/json" in accept:
+#         return JSONResponse(status_code=404, content={"detail": "Not found"})
+#     return RedirectResponse("/dashboard")

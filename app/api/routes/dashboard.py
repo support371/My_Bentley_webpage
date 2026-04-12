@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, Request, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy import select, func, text
@@ -25,21 +25,99 @@ _feed_cache: dict = {}
 _CACHE_TTL = 5
 
 
+# ─── PRIMARY ROUTES (canonical URL shell) ────────────────
+
 @router.get("/", response_class=HTMLResponse, tags=["Dashboard"])
-async def root_redirect(request: Request):
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse("/dashboard")
-
-
-@router.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
-async def dashboard(request: Request, session: AsyncSession = Depends(get_session)):
+async def root(request: Request, session: AsyncSession = Depends(get_session)):
+    """Dashboard at root — canonical entry point."""
     user = get_optional_user(request)
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "user": user,
         "app_name": settings.APP_NAME,
+        "page_title": "Dashboard",
     })
 
+
+@router.get("/events", response_class=HTMLResponse, tags=["Events"])
+async def events_page(request: Request, session: AsyncSession = Depends(get_session)):
+    user = get_optional_user(request)
+    return templates.TemplateResponse("events.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "page_title": "Event Stream",
+    })
+
+
+@router.get("/itwins", response_class=HTMLResponse, tags=["iTwins"])
+async def itwins_page(request: Request, session: AsyncSession = Depends(get_session)):
+    user = get_optional_user(request)
+    return templates.TemplateResponse("itwins.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "page_title": "iTwins Explorer",
+    })
+
+
+@router.get("/webhooks", response_class=HTMLResponse, tags=["Webhooks"])
+async def webhooks_page(request: Request, session: AsyncSession = Depends(get_session)):
+    user = get_optional_user(request)
+    # Load recent webhook deliveries for the UI table
+    result = await session.execute(
+        select(WebhookDelivery).order_by(WebhookDelivery.received_at.desc()).limit(100)
+    )
+    deliveries = result.scalars().all()
+
+    total = await session.scalar(select(func.count(WebhookDelivery.id))) or 0
+    processed = await session.scalar(
+        select(func.count(WebhookDelivery.id)).where(WebhookDelivery.processing_status == "processed")
+    ) or 0
+    errors = await session.scalar(
+        select(func.count(WebhookDelivery.id)).where(WebhookDelivery.processing_status == "error")
+    ) or 0
+    invalid_sig = await session.scalar(
+        select(func.count(WebhookDelivery.id)).where(WebhookDelivery.signature_valid == False)  # noqa: E712
+    ) or 0
+
+    success_rate = round((processed / total * 100), 1) if total else 0.0
+
+    return templates.TemplateResponse("webhooks.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "page_title": "Webhooks",
+        "deliveries": deliveries,
+        "stats": {
+            "total": total,
+            "processed": processed,
+            "errors": errors,
+            "invalid_sig": invalid_sig,
+            "success_rate": success_rate,
+        },
+    })
+
+
+# ─── BACKWARDS-COMPAT REDIRECTS ──────────────────────────
+
+@router.get("/dashboard", response_class=HTMLResponse, tags=["Dashboard"])
+async def dashboard_compat(request: Request):
+    """Redirect legacy /dashboard to / for backwards compatibility."""
+    return RedirectResponse("/", status_code=301)
+
+
+@router.get("/events-view", response_class=HTMLResponse, tags=["Events"])
+async def events_view_compat(request: Request):
+    return RedirectResponse("/events", status_code=301)
+
+
+@router.get("/itwins-view", response_class=HTMLResponse, tags=["iTwins"])
+async def itwins_view_compat(request: Request):
+    return RedirectResponse("/itwins", status_code=301)
+
+
+# ─── DASHBOARD FEED (real backend data) ──────────────────
 
 @router.get("/dashboard/feed", tags=["Dashboard"])
 async def dashboard_feed(
@@ -84,7 +162,7 @@ async def dashboard_feed(
     else:
         insight = "No events received yet. Use ⚡ Test Event to inject demo data."
 
-    health = "healthy" if windowed_total > 0 else ("idle" if total_events_alltime > 0 else "idle")
+    health = "healthy" if windowed_total > 0 else "idle"
     if windowed_total > 100:
         health = "busy"
 
@@ -131,33 +209,18 @@ async def dashboard_feed(
     return payload
 
 
-@router.post("/dashboard/test-webhook", tags=["Dashboard"])
-async def test_webhook_ingest(
-    request: Request,
+# ─── API ALIAS: /api/dashboard/summary ───────────────────
+
+@router.get("/api/dashboard/summary", tags=["Dashboard"])
+async def dashboard_summary(
+    timeRange: str = Query(default="24h"),
     session: AsyncSession = Depends(get_session),
 ):
-    from app.services.event_processor import process_webhook_event
-    from app.models.events import WebhookDelivery
-    body = await request.body()
-    data = json.loads(body)
+    """Alias for /dashboard/feed — canonical API endpoint for UI backend wiring."""
+    return await dashboard_feed(timeRange=timeRange, session=session)
 
-    delivery = WebhookDelivery(
-        remote_ip=request.client.host if request.client else "127.0.0.1",
-        headers="{}",
-        raw_body=body.decode(),
-        signature_valid=True,
-        processing_status="received"
-    )
-    session.add(delivery)
-    await session.flush()
 
-    event = await process_webhook_event(body, {}, session)
-    delivery.event_id = event.id
-    delivery.processing_status = "processed"
-    await session.commit()
-
-    return {"status": "ok", "event_id": event.id}
-
+# ─── CHART & STATS ENDPOINTS ─────────────────────────────
 
 @router.get("/api/charts/trend", tags=["Dashboard"])
 async def chart_trend(
@@ -169,6 +232,18 @@ async def chart_trend(
     now = datetime.utcnow()
 
     if hours <= 2:
+        bucket = "minute"
+        trunc = "strftime('%Y-%m-%d %H:%M', received_at)"
+    elif hours <= 72:
+        bucket = "hour"
+        trunc = "strftime('%Y-%m-%d %H', received_at)"
+    else:
+        bucket = "day"
+        trunc = "strftime('%Y-%m-%d', received_at)"
+
+    q = text(f"SELECT {trunc} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket")
+    result = await session.execute(q, {"since": since})
+    rows = result.fetchall()
         trunc_sql = "to_timestamp(floor(extract(epoch from received_at) / 300) * 300) AT TIME ZONE 'UTC'"
         step = timedelta(minutes=5)
         fmt = "%H:%M"
@@ -185,7 +260,10 @@ async def chart_trend(
         text(f"SELECT {trunc_sql} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket"),
         {"since": since},
     )
-    actual = {row[0].replace(tzinfo=None): int(row[1]) for row in result}
+    cat_rows = categories_result.fetchall()
+
+    labels = [row.bucket for row in rows]
+    counts = [int(row.cnt) for row in rows]
 
     current = since.replace(second=0, microsecond=0)
     if step == timedelta(minutes=5):
@@ -221,8 +299,8 @@ async def system_stats(session: AsyncSession = Depends(get_session)):
         select(func.count(Integration.id)).where(Integration.status == "connected")
     ) or 0
     uptime_seconds = int(time.time() - _app_start_time)
-    hours, rem = divmod(uptime_seconds, 3600)
-    minutes = rem // 60
+    hours_up, rem = divmod(uptime_seconds, 3600)
+    minutes_up = rem // 60
     return {
         "total_events": total_events,
         "total_itwins": total_itwins,
@@ -232,27 +310,7 @@ async def system_stats(session: AsyncSession = Depends(get_session)):
         "processing_errors": errors,
         "integrations_connected": integrations_connected,
         "uptime_seconds": uptime_seconds,
-        "uptime_human": f"{hours}h {minutes}m",
+        "uptime_human": f"{hours_up}h {minutes_up}m",
         "app_version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
     }
-
-
-@router.get("/events-view", response_class=HTMLResponse, tags=["Dashboard"])
-async def events_view(request: Request, session: AsyncSession = Depends(get_session)):
-    user = get_optional_user(request)
-    return templates.TemplateResponse("events.html", {
-        "request": request,
-        "user": user,
-        "app_name": settings.APP_NAME,
-    })
-
-
-@router.get("/itwins-view", response_class=HTMLResponse, tags=["Dashboard"])
-async def itwins_view(request: Request, session: AsyncSession = Depends(get_session)):
-    user = get_optional_user(request)
-    return templates.TemplateResponse("itwins.html", {
-        "request": request,
-        "user": user,
-        "app_name": settings.APP_NAME,
-    })

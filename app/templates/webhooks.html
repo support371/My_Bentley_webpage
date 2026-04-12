@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Webhooks — {{ app_name }}{% endblock %}
+{% block page_title %}Webhooks{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Webhook Deliveries</h1>
+    <p class="page-subtitle">Incoming webhook traffic from Bentley iTwin</p>
+  </div>
+</div>
+
+<!-- ─── KPI bar ─────────────────────────────────────────────── -->
+<div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:1.5rem;">
+  <div class="kpi-card">
+    <div class="kpi-label">Total</div>
+    <div class="kpi-value">{{ stats.total }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Processed</div>
+    <div class="kpi-value" style="color:var(--success)">{{ stats.processed }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Errors</div>
+    <div class="kpi-value" style="color:var(--danger)">{{ stats.errors }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Invalid Sig</div>
+    <div class="kpi-value" style="color:var(--warning)">{{ stats.invalid_sig }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Success Rate</div>
+    <div class="kpi-value">{{ stats.success_rate }}%</div>
+  </div>
+</div>
+
+<!-- ─── Deliveries table ─────────────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Recent Deliveries</h2>
+    <span class="badge badge-neutral">Last 100</span>
+  </div>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Received</th>
+          <th>Remote IP</th>
+          <th>Status</th>
+          <th>Sig Valid</th>
+          <th>Event Type</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deliveries %}
+        <tr>
+          <td class="mono text-sm">{{ d.received_at.strftime('%Y-%m-%d %H:%M:%S') if d.received_at else '—' }}</td>
+          <td class="mono text-sm">{{ d.remote_ip or '—' }}</td>
+          <td>
+            {% if d.processing_status == 'processed' %}
+              <span class="badge badge-success">processed</span>
+            {% elif d.processing_status == 'error' %}
+              <span class="badge badge-danger">error</span>
+            {% elif d.processing_status == 'rejected' %}
+              <span class="badge badge-warning">rejected</span>
+            {% else %}
+              <span class="badge badge-neutral">{{ d.processing_status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if d.signature_valid %}
+              <span class="badge badge-success">✓</span>
+            {% else %}
+              <span class="badge badge-danger">✗</span>
+            {% endif %}
+          </td>
+          <td class="mono text-sm">{{ d.event_type or '—' }}</td>
+          <td class="text-sm text-muted">{{ (d.error_message or '')[:60] }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="empty-cell">No webhook deliveries yet. POST to <code>/webhook</code> to get started.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
