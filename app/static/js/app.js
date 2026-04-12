@@ -71,7 +71,7 @@ window._copyText = function(text, label) {
 document.addEventListener('keydown', function(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   if (e.altKey) {
-    var shortcuts = { d: '/dashboard', e: '/events-view', i: '/itwins-view', g: '/integrations', a: '/admin' };
+    var shortcuts = { d: '/', e: '/events', i: '/itwins', g: '/integrations', w: '/webhooks', a: '/admin' };
     if (shortcuts[e.key]) { e.preventDefault(); window.location.href = shortcuts[e.key]; }
   }
   if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
@@ -79,6 +79,25 @@ document.addEventListener('keydown', function(e) {
     if (searchEl) { e.preventDefault(); searchEl.focus(); }
   }
 });
+
+/* ─── SIDEBAR ───────────────────────────────────────────── */
+(function initSidebar() {
+  var collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  if (collapsed) document.body.classList.add('sidebar-collapsed');
+})();
+
+function toggleSidebar() {
+  var isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+  localStorage.setItem('sidebarCollapsed', isCollapsed);
+}
+
+function openSidebar() {
+  document.body.classList.add('sidebar-open');
+}
+
+function closeSidebar() {
+  document.body.classList.remove('sidebar-open');
+}
 
 /* ─── FORMAT HELPERS ───────────────────────────────────── */
 window._timeAgo = function(dateStr) {
