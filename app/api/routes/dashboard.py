@@ -181,6 +181,9 @@ async def dashboard_feed(
             "received_at": e.received_at.isoformat(),
         })
 
+    from app.services.launch_readiness import get_launch_readiness
+    readiness = get_launch_readiness()
+
     payload = {
         "meta": {"timeRange": timeRange, "generatedAt": datetime.utcnow().isoformat(), "cached": False},
         "kpis": {
@@ -196,6 +199,10 @@ async def dashboard_feed(
         "insights": insight,
         "eventTypeBreakdown": stats["type_counts"],
         "categoryBreakdown": stats["cat_counts"],
+        "systemStatus": {
+            "overall": readiness["overall"],
+            "checks": readiness["summary"]
+        }
     }
 
     _feed_cache[cache_key] = {"ts": now, "data": payload}
@@ -216,12 +223,13 @@ async def dashboard_summary(
 # ─── CHART & STATS ENDPOINTS ─────────────────────────────
 
 @router.get("/api/charts/trend", tags=["Dashboard"])
-async def charts_trend(
-    timeRange: str = Query(default="7d"),
+async def chart_trend(
+    timeRange: str = Query(default="24h"),
     session: AsyncSession = Depends(get_session),
 ):
-    hours = HOURS_MAP.get(timeRange, 168)
+    hours = HOURS_MAP.get(timeRange, 24)
     since = datetime.utcnow() - timedelta(hours=hours)
+    now = datetime.utcnow()
 
     if hours <= 2:
         bucket = "minute"
@@ -236,24 +244,42 @@ async def charts_trend(
     q = text(f"SELECT {trunc} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket")
     result = await session.execute(q, {"since": since})
     rows = result.fetchall()
+        trunc_sql = "to_timestamp(floor(extract(epoch from received_at) / 300) * 300) AT TIME ZONE 'UTC'"
+        step = timedelta(minutes=5)
+        fmt = "%H:%M"
+    elif hours <= 168:
+        trunc_sql = "date_trunc('hour', received_at)"
+        step = timedelta(hours=1)
+        fmt = "%a %H:%M" if hours > 24 else "%H:%M"
+    else:
+        trunc_sql = "date_trunc('day', received_at)"
+        step = timedelta(days=1)
+        fmt = "%b %d"
 
-    categories_result = await session.execute(
-        select(Event.event_category, func.count(Event.id).label("cnt"))
-        .where(Event.received_at >= since)
-        .group_by(Event.event_category)
+    result = await session.execute(
+        text(f"SELECT {trunc_sql} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket"),
+        {"since": since},
     )
     cat_rows = categories_result.fetchall()
 
     labels = [row.bucket for row in rows]
     counts = [int(row.cnt) for row in rows]
 
-    return {
-        "labels": labels,
-        "counts": counts,
-        "total": sum(counts),
-        "bucket": bucket,
-        "categories": {row.event_category: int(row.cnt) for row in cat_rows if row.event_category},
-    }
+    current = since.replace(second=0, microsecond=0)
+    if step == timedelta(minutes=5):
+        current = current.replace(minute=(current.minute // 5) * 5)
+    elif step == timedelta(hours=1):
+        current = current.replace(minute=0)
+    else:
+        current = current.replace(hour=0, minute=0)
+
+    labels, data = [], []
+    while current <= now:
+        labels.append(current.strftime(fmt))
+        data.append(actual.get(current, 0))
+        current += step
+
+    return {"labels": labels, "data": data, "timeRange": timeRange, "total": sum(data)}
 
 
 @router.get("/api/stats", tags=["Dashboard"])

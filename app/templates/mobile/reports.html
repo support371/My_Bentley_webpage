@@ -2,7 +2,7 @@
 
 {% block title %}Mobile Reports — {{ app_name }}{% endblock %}
 {% block mobile_title %}Reports{% endblock %}
-{% block mobile_subtitle %}Operational reporting, SLA proxy views, and export shortcuts optimized for field and leadership use.{% endblock %}
+{% block mobile_subtitle %}Operational reporting, delivery metrics, and export shortcuts.{% endblock %}
 
 {% block mobile_body %}
 <section class="mobile-card">
@@ -16,11 +16,12 @@
 </section>
 
 <section class="mobile-card">
-  <div class="mobile-card-head"><h2>Recommended rollout</h2></div>
-  <div class="mobile-note-list">
-    <div>Use <strong>Scheduled Reports</strong> for recurring operations packs.</div>
-    <div>Use <strong>Customize Report</strong> for role-based views and stakeholder summaries.</div>
-    <div>Use <strong>SLA Settings</strong> as an error-rate governance placeholder until a dedicated SLA model is introduced.</div>
+  <div class="mobile-card-head"><h2>Quick links</h2></div>
+  <div class="mobile-grid-2">
+    <a class="mobile-link-card" href="/events-view">Event stream</a>
+    <a class="mobile-link-card" href="/admin">Alert rules</a>
+    <a class="mobile-link-card" href="/itwins-view">iTwin registry</a>
+    <a class="mobile-link-card" href="/imodels-view">iModel explorer</a>
   </div>
 </section>
 {% endblock %}

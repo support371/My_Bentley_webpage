@@ -6,15 +6,18 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.db.database import get_session
 from app.core.security import get_optional_user, require_admin
 from app.models.tenants import Tenant
 from app.models.resources import AlertRule, Alert
 from app.models.auth import User
-from app.models.events import WebhookDelivery
+from app.models.events import Event, WebhookDelivery
+from app.models.integrations import Integration
 from app.services.bentley.client import test_connection, get_access_token, list_itwins, list_webhooks, create_webhook
+from app.services.bentley import diagnostics as diag
+from app.services.launch_readiness import get_launch_readiness
 from app.core.config import settings
 from app.core.security import hash_password
 
@@ -35,6 +38,9 @@ async def admin_dashboard(request: Request, user: dict = Depends(require_admin),
         select(Alert).order_by(Alert.triggered_at.desc()).limit(10)
     )
     recent_alerts = alert_result.scalars().all()
+
+    summary = await diag.summarize_bentley_readiness(request)
+
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "user": user,
@@ -51,12 +57,149 @@ async def admin_dashboard(request: Request, user: dict = Depends(require_admin),
             "JWT_EXPIRE_MINUTES": settings.JWT_EXPIRE_MINUTES,
             "WEBHOOK_SECRET_SET": bool(settings.WEBHOOK_SECRET),
         },
+        "settings": settings,
+        "diag_summary": summary,
     })
 
 
+@router.get("/admin/diagnostics", response_class=HTMLResponse, tags=["Admin"])
+async def admin_diagnostics_page(request: Request, session: AsyncSession = Depends(get_session)):
+    user = get_optional_user(request)
+    summary = await diag.summarize_bentley_readiness(request)
+    return templates.TemplateResponse("admin_diagnostics.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "summary": summary,
+        "settings": settings,
+    })
+
+
+# ─── Diagnostics API ─────────────────────────────────────────────────────────
+
+@router.get("/api/admin/summary", tags=["Admin"])
+async def admin_summary(session: AsyncSession = Depends(get_session)):
+    user_count = await session.scalar(select(func.count(User.id))) or 0
+    tenant_count = await session.scalar(select(func.count(Tenant.id))) or 0
+    event_count = await session.scalar(select(func.count(Event.id))) or 0
+    alert_count = await session.scalar(select(func.count(Alert.id))) or 0
+    integration_count = await session.scalar(select(func.count(Integration.id)).where(Integration.status == "connected")) or 0
+
+    return {
+        "users": user_count,
+        "tenants": tenant_count,
+        "total_events": event_count,
+        "active_alerts": alert_count,
+        "connected_integrations": integration_count,
+        "platform_version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT
+    }
+
+
+@router.get("/api/admin/diagnostics/summary", tags=["Admin Diagnostics"])
+async def diagnostics_summary(request: Request):
+    return await diag.summarize_bentley_readiness(request)
+
+
+@router.post("/api/admin/diagnostics/test-oauth", tags=["Admin Diagnostics"])
+async def diagnostics_test_oauth(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    cid = body.get("client_id") or settings.BENTLEY_CLIENT_ID
+    csec = body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET
+    return await diag.test_oauth_token(cid, csec)
+
+
+@router.post("/api/admin/diagnostics/test-itwins", tags=["Admin Diagnostics"])
+async def diagnostics_test_itwins(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    token = await get_access_token(
+        body.get("client_id") or settings.BENTLEY_CLIENT_ID,
+        body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET,
+    )
+    return await diag.test_itwins_access(token)
+
+
+@router.post("/api/admin/diagnostics/test-webhooks", tags=["Admin Diagnostics"])
+async def diagnostics_test_webhooks(request: Request):
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    token = await get_access_token(
+        body.get("client_id") or settings.BENTLEY_CLIENT_ID,
+        body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET,
+    )
+    return await diag.test_webhooks_access(token)
+
+
+@router.get("/api/admin/diagnostics/callback-url", tags=["Admin Diagnostics"])
+async def diagnostics_callback_url(request: Request):
+    return diag.compute_callback_url(request)
+
+
+@router.get("/api/admin/diagnostics/security-state", tags=["Admin Diagnostics"])
+async def diagnostics_security_state():
+    env_check = diag.check_env_configuration()
+    sec_check = diag.check_webhook_security_state()
+    is_prod = settings.ENVIRONMENT == "production"
+    warnings = []
+    if is_prod and settings.SKIP_SIGNATURE_VERIFY:
+        warnings.append("SKIP_SIGNATURE_VERIFY is True in production")
+    if is_prod and not settings.WEBHOOK_SECRET:
+        warnings.append("WEBHOOK_SECRET missing in production")
+    if is_prod and not settings.COOKIE_SECURE:
+        warnings.append("COOKIE_SECURE is False in production")
+    return {
+        "environment": settings.ENVIRONMENT,
+        "is_production": is_prod,
+        "bentley_client_id_present": bool(settings.BENTLEY_CLIENT_ID),
+        "bentley_client_id_masked": diag.mask_client_id(settings.BENTLEY_CLIENT_ID),
+        "bentley_client_secret_present": bool(settings.BENTLEY_CLIENT_SECRET),
+        "webhook_secret_present": bool(settings.WEBHOOK_SECRET),
+        "signature_verify_enabled": not settings.SKIP_SIGNATURE_VERIFY,
+        "cookie_secure": settings.COOKIE_SECURE,
+        "production_warnings": warnings,
+        "env_check": env_check,
+        "security_check": sec_check,
+    }
+
+
+# ─── Launch Readiness ────────────────────────────────────────────────────────
+
+@router.get("/api/admin/launch-readiness", tags=["Admin"])
+async def launch_readiness_api(request: Request, user: dict = Depends(require_admin)):
+    return get_launch_readiness()
+
+
+@router.get("/admin/launch-readiness", response_class=HTMLResponse, tags=["Admin"])
+async def launch_readiness_page(request: Request, user: dict = Depends(require_admin)):
+    readiness = get_launch_readiness()
+    return templates.TemplateResponse("admin_launch_readiness.html", {
+        "request": request,
+        "user": user,
+        "app_name": settings.APP_NAME,
+        "readiness": readiness,
+    })
+
+
+# ─── Bentley connection (original routes, hardened) ───────────────────────────
+
 @router.post("/admin/test-connection", tags=["Admin"])
 async def api_test_connection(request: Request, user: dict = Depends(require_admin)):
-    body = await request.json()
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
     result = await test_connection(
         client_id=body.get("client_id") or settings.BENTLEY_CLIENT_ID,
         client_secret=body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET,
@@ -66,12 +209,16 @@ async def api_test_connection(request: Request, user: dict = Depends(require_adm
 
 @router.post("/admin/fetch-itwins", tags=["Admin"])
 async def api_fetch_itwins(request: Request, user: dict = Depends(require_admin), session: AsyncSession = Depends(get_session)):
-    body = await request.json()
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
     cid = body.get("client_id") or settings.BENTLEY_CLIENT_ID
     csec = body.get("client_secret") or settings.BENTLEY_CLIENT_SECRET
     token = await get_access_token(cid, csec)
     if not token:
-        raise HTTPException(status_code=400, detail="Could not obtain access token")
+        raise HTTPException(status_code=400, detail="Could not obtain access token — check BENTLEY_CLIENT_ID and BENTLEY_CLIENT_SECRET in Replit Secrets")
     itwins = await list_itwins(token)
     return {"count": len(itwins), "itwins": itwins[:20]}
 
@@ -80,7 +227,7 @@ async def api_fetch_itwins(request: Request, user: dict = Depends(require_admin)
 async def api_list_webhooks(request: Request, user: dict = Depends(require_admin)):
     token = await get_access_token()
     if not token:
-        raise HTTPException(status_code=400, detail="Bentley not configured")
+        raise HTTPException(status_code=400, detail="Bentley not configured — set credentials in Replit Secrets")
     wh = await list_webhooks(token)
     return {"webhooks": wh}
 
@@ -162,33 +309,13 @@ async def toggle_alert_rule(rule_id: str, request: Request, user: dict = Depends
 
 @router.post("/admin/alerts/test-delivery", tags=["Admin"])
 async def test_alert_delivery(request: Request, user: dict = Depends(require_admin)):
+    from app.services.alerts.engine import test_delivery
     body = await request.json()
     dest = body.get("destination", {})
-    dtype = dest.get("type", "webhook")
-    import httpx
-    test_payload = {
-        "text": "✅ iTwin Ops Center — test delivery successful",
-        "event_type": "test.delivery",
-        "severity": "info",
-        "timestamp": datetime.utcnow().isoformat(),
-    }
-    try:
-        if dtype in ("slack", "discord", "webhook"):
-            url = dest.get("url", "")
-            if not url:
-                return {"ok": False, "error": "No URL provided"}
-            async with httpx.AsyncClient(timeout=5) as client:
-                if dtype == "slack":
-                    r = await client.post(url, json={"text": test_payload["text"]})
-                elif dtype == "discord":
-                    r = await client.post(url, json={"content": test_payload["text"]})
-                else:
-                    r = await client.post(url, json=test_payload)
-            return {"ok": r.status_code < 400, "status": r.status_code}
-        else:
-            return {"ok": True, "message": f"Test for {dtype} noted (no external call needed)"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+    if not dest.get("type"):
+        raise HTTPException(status_code=422, detail="destination.type is required")
+    result = await test_delivery(dest)
+    return result
 
 
 # ── User Management ───────────────────────────────────────────────────────────

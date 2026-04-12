@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bentley-fastapi-config
+data:
+  ENVIRONMENT: {{ .Values.config.environment | quote }}
+  DEBUG: {{ .Values.config.debug | quote }}
+  PUBLIC_BASE_URL: {{ .Values.config.publicBaseUrl | quote }}
+  COOKIE_SECURE: {{ .Values.config.cookieSecure | quote }}
+  INITIAL_ADMIN_EMAIL: {{ .Values.config.initialAdminEmail | quote }}

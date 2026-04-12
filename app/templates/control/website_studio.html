@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Website Studio - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="/control-plane">Control Plane</a></li>
+                <li class="breadcrumb-item active">Website Studio</li>
+              </ol>
+            </nav>
+            <h1 class="h3 mb-0">Website Studio</h1>
+            <p class="text-muted">Manage the public-facing Bentley platform website and documentation.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2">Sync Content</button>
+            <button class="btn btn-teal btn-sm">Open Editor</button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Active Properties</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% for site in sites %}
+                    <div class="d-flex align-items-center justify-content-between p-3 mb-3 rounded border">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-teal-light text-teal p-3 rounded me-3">
+                                🌐
+                            </div>
+                            <div>
+                                <h6 class="mb-0">{{ site.name }} <span class="badge {% if site.status == 'Published' %}bg-success{% else %}bg-warning text-dark{% endif %} ms-2">{{ site.status }}</span></h6>
+                                <small class="text-muted">{{ site.url }} • {{ site.type }}</small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="fw-bold">{{ site.visitors }}</div>
+                            <small class="text-muted">Traffic</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent border-0 pt-4 px-4">
+                    <h5 class="card-title mb-0">Design System</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex gap-2 mb-4">
+                        <div class="rounded-circle bg-primary" style="width:30px;height:30px;"></div>
+                        <div class="rounded-circle bg-secondary" style="width:30px;height:30px;"></div>
+                        <div class="rounded-circle bg-info" style="width:30px;height:30px;"></div>
+                        <div class="rounded-circle bg-teal" style="width:30px;height:30px;"></div>
+                    </div>
+                    <div class="small">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Primary Font</span>
+                            <span class="font-monospace">Inter</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Border Radius</span>
+                            <span class="font-monospace">12px</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm w-100 mt-3">Theme Editor</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.bg-teal-light { background-color: rgba(20, 184, 166, 0.1); }
+.text-teal { color: #14b8a6; }
+.btn-teal { background-color: #14b8a6; color: white; }
+.btn-teal:hover { background-color: #0d9488; color: white; }
+</style>
+{% endblock %}

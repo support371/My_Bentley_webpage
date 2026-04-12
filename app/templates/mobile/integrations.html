@@ -1,15 +1,31 @@
 {% extends "mobile/base_mobile.html" %}
 
-{% block title %}Mobile Catalog — {{ app_name }}{% endblock %}
-{% block mobile_title %}Catalog{% endblock %}
-{% block mobile_subtitle %}Mobile marketplace view for connected services and workflows.{% endblock %}
+{% block title %}Mobile Integrations — {{ app_name }}{% endblock %}
+{% block mobile_title %}Integrations{% endblock %}
+{% block mobile_subtitle %}Connected services status and catalog — grouped by operational function.{% endblock %}
 
 {% block mobile_body %}
 <section class="mobile-card">
   <div class="mobile-card-head">
-    <h2>Catalog</h2>
-    <a class="mobile-action-link" href="/dashboard">Desktop view</a>
+    <h2>Service Catalog</h2>
+    <a class="mobile-action-link" href="/integrations">Desktop view</a>
   </div>
-  <div class="mobile-empty">Open the desktop catalog to manage connected services.</div>
+  <div class="mobile-filter-row">
+    <input
+      type="search"
+      id="mobileIntegrationFilter"
+      placeholder="Filter integrations…"
+      oninput="window.MobileOps.filterIntegrations()"
+    />
+  </div>
+  <div id="mobileIntegrationGroups">
+    <div class="mobile-empty">Loading integrations…</div>
+  </div>
 </section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initIntegrationsPage();
+</script>
 {% endblock %}

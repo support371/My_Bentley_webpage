@@ -2,6 +2,7 @@
 {% block title %}Overview — {{ app_name }}{% endblock %}
 
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 .kpi-grid { grid-template-columns: repeat(5, 1fr) !important; }
 @media(max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; } }
@@ -29,6 +30,13 @@
 .test-modal-body { padding:1.4rem; }
 .test-modal-footer { padding:.9rem 1.4rem; border-top:1px solid var(--border);
   display:flex; gap:.5rem; justify-content:flex-end; }
+/* Charts */
+.chart-wrap { position:relative; }
+.trend-wrap { height:170px; }
+.donut-wrap { height:180px; }
+@media(max-width:640px) { .trend-wrap { height:130px; } .donut-wrap { height:160px; } }
+.chart-empty { display:flex; align-items:center; justify-content:center;
+  height:100%; color:var(--text-muted); font-size:.85rem; }
 </style>
 {% endblock %}
 
@@ -91,6 +99,17 @@
   </div>
 </div>
 
+<!-- Event Volume Trend Chart -->
+<div class="card" style="margin-bottom:1.25rem;">
+  <div class="card-header">
+    <h2 class="card-title">Event Volume Trend</h2>
+    <span class="text-muted" style="font-size:.8rem;" id="trendLabel">Loading…</span>
+  </div>
+  <div class="chart-wrap trend-wrap">
+    <canvas id="trendChart"></canvas>
+  </div>
+</div>
+
 <div class="main-grid">
   <div class="main-col">
 
@@ -141,7 +160,9 @@
       <div class="card-header">
         <h2 class="card-title">Event Categories</h2>
       </div>
-      <div id="categoryBars" class="dist-list"><div class="dist-placeholder">Loading…</div></div>
+      <div class="chart-wrap donut-wrap">
+        <canvas id="categoryChart"></canvas>
+      </div>
     </div>
 
     <div class="card">
@@ -161,6 +182,10 @@
         <a href="/itwins-view" class="quick-link">
           <span class="ql-icon">◈</span>
           <div><div class="ql-title">iTwin Explorer</div><div class="ql-sub">View active projects</div></div>
+        </a>
+        <a href="/imodels-view" class="quick-link">
+          <span class="ql-icon">⬡</span>
+          <div><div class="ql-title">iModel Explorer</div><div class="ql-sub">Browse digital models</div></div>
         </a>
         <a href="/integrations" class="quick-link">
           <span class="ql-icon">🔌</span>
@@ -241,19 +266,142 @@
 let currentRange = '24h';
 let autoRefreshInterval = null;
 let lastEventIds = new Set();
+let _trendChart = null;
+let _categoryChart = null;
 
+/* ── Chart helpers ─────────────────────────────────────── */
+function _chartColors() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  return {
+    grid:   dark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)',
+    text:   dark ? '#94a3b8' : '#64748b',
+    line:   '#3b82f6',
+    fill:   dark ? 'rgba(59,130,246,.18)' : 'rgba(59,130,246,.10)',
+    donuts: ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6'],
+  };
+}
+
+function buildTrendChart(labels, data) {
+  const ctx = document.getElementById('trendChart');
+  if (!ctx) return;
+  const c = _chartColors();
+  const isEmpty = data.every(v => v === 0);
+  if (_trendChart) _trendChart.destroy();
+  _trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Events',
+        data,
+        fill: true,
+        borderColor: c.line,
+        backgroundColor: c.fill,
+        tension: 0.38,
+        pointRadius: labels.length <= 28 ? 2 : 0,
+        pointHoverRadius: 5,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode: 'index', intersect: false },
+      },
+      scales: {
+        x: {
+          grid: { color: c.grid },
+          ticks: { color: c.text, maxTicksLimit: 10, font: { size: 11 } },
+        },
+        y: {
+          grid: { color: c.grid },
+          ticks: { color: c.text, precision: 0, font: { size: 11 } },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+  if (isEmpty) {
+    const overlay = document.createElement('div');
+    overlay.className = 'chart-empty';
+    overlay.style.cssText = 'position:absolute;inset:0;';
+    overlay.textContent = 'No events in this period';
+    ctx.parentElement.appendChild(overlay);
+  }
+}
+
+function buildCategoryChart(breakdown) {
+  const ctx = document.getElementById('categoryChart');
+  if (!ctx) return;
+  ctx.parentElement.querySelectorAll('.chart-empty').forEach(e => e.remove());
+  const c = _chartColors();
+  const entries = Object.entries(breakdown || {}).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  if (_categoryChart) _categoryChart.destroy();
+  if (!entries.length) {
+    const el = document.createElement('div');
+    el.className = 'chart-empty';
+    el.style.cssText = 'position:absolute;inset:0;';
+    el.textContent = 'No data yet';
+    ctx.parentElement.appendChild(el);
+    return;
+  }
+  _categoryChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: entries.map(([k]) => k),
+      datasets: [{
+        data: entries.map(([,v]) => v),
+        backgroundColor: c.donuts.slice(0, entries.length),
+        borderWidth: 2,
+        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#1e293b',
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: c.text, font: { size: 11 }, boxWidth: 11, padding: 10 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed / ctx.dataset.data.reduce((a,b)=>a+b,0) * 100)}%)`,
+          },
+        },
+      },
+      cutout: '62%',
+    },
+  });
+}
+
+/* ── Main refresh ──────────────────────────────────────── */
 async function refreshDashboard() {
   const btn = document.getElementById('refreshBtn');
   btn.textContent = '↻ …';
   try {
-    const res = await fetch('/dashboard/feed?timeRange=' + currentRange);
-    const d = await res.json();
+    const [feedRes, trendRes] = await Promise.all([
+      fetch('/dashboard/feed?timeRange=' + currentRange),
+      fetch('/api/charts/trend?timeRange=' + currentRange),
+    ]);
+    const d = await feedRes.json();
+    const t = await trendRes.json();
     updateKPIs(d.kpis);
     updateHealth(d.health, d.insights);
     updateEventsTable(d.recentEvents);
-    updateDist('categoryBars', d.categoryBreakdown, d.kpis.totalEvents);
     updateDist('typeBars', d.eventTypeBreakdown, d.kpis.totalEvents);
     document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    // Trend label
+    const rangeLabel = {'1h':'Last 1 hour','6h':'Last 6 hours','24h':'Last 24 hours','7d':'Last 7 days','30d':'Last 30 days'}[currentRange] || currentRange;
+    document.getElementById('trendLabel').textContent = rangeLabel + ' · ' + (t.total || 0) + ' events';
+    // Charts
+    buildTrendChart(t.labels, t.data);
+    buildCategoryChart(d.categoryBreakdown);
   } catch(e) { console.error(e); }
   btn.textContent = '↻ Refresh';
 }
@@ -290,14 +438,25 @@ function animNum(id, end) {
   requestAnimationFrame(step);
 }
 
-function updateHealth(health, insights) {
+function updateHealth(health, insights, systemStatus) {
   const dot = document.getElementById('healthDot');
   const text = document.getElementById('healthText');
   const pill = document.getElementById('healthPill');
   dot.className = 'health-dot health-' + health;
   text.textContent = health.charAt(0).toUpperCase() + health.slice(1);
   pill.className = 'health-pill health-pill-' + health;
-  document.getElementById('insightsBox').textContent = insights;
+
+  let insightHtml = `<div>${insights}</div>`;
+  if (systemStatus) {
+    const statusClass = systemStatus.overall === 'ready' ? 'text-success' : (systemStatus.overall === 'ready_with_warnings' ? 'text-warning' : 'text-danger');
+    insightHtml += `<div class="mt-2 pt-2 border-top small">
+      <span class="fw-bold">Platform Readiness:</span>
+      <span class="${statusClass}">${systemStatus.overall.replace(/_/g, ' ')}</span>
+      <span class="text-muted">(${systemStatus.checks.ok}/${systemStatus.checks.total} checks)</span>
+      <a href="/admin/launch-readiness" class="ms-2">Details →</a>
+    </div>`;
+  }
+  document.getElementById('insightsBox').innerHTML = insightHtml;
 }
 
 function updateEventsTable(events) {

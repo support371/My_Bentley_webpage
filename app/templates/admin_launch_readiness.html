@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Launch Readiness — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+.readiness-hero { padding: 1.5rem 0 1rem; }
+.readiness-score {
+  display: flex; align-items: center; gap: 1rem;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;
+}
+.score-badge {
+  font-size: 2rem; font-weight: 700; min-width: 3rem; text-align: center;
+}
+.score-badge.ready { color: var(--green); }
+.score-badge.warn  { color: var(--orange); }
+.score-badge.error { color: var(--red); }
+.score-meta { flex: 1; }
+.score-label { font-size: 1rem; font-weight: 600; }
+.score-sub { font-size: .8rem; color: var(--text-muted); margin-top: .2rem; }
+.score-chips { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+.chip { padding: .2rem .6rem; border-radius: 20px; font-size: .75rem; font-weight: 600; }
+.chip-ok   { background: var(--green-bg); color: var(--green); }
+.chip-warn { background: var(--orange-bg); color: var(--orange); }
+.chip-err  { background: var(--red-bg); color: var(--red); }
+.chip-info { background: var(--bg-secondary); color: var(--text-muted); }
+
+.cat-section { margin-bottom: 1.75rem; }
+.cat-title { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-muted); margin-bottom: .6rem; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .75rem; }
+
+.check-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 1rem 1.1rem;
+}
+.check-card.ok   { border-left: 4px solid var(--green); }
+.check-card.warn { border-left: 4px solid var(--orange); }
+.check-card.error{ border-left: 4px solid var(--red); }
+.check-card.info { border-left: 4px solid var(--text-muted); }
+
+.check-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+.check-dot { width: .55rem; height: .55rem; border-radius: 50%; flex-shrink: 0; }
+.dot-ok    { background: var(--green); }
+.dot-warn  { background: var(--orange); }
+.dot-error { background: var(--red); }
+.dot-info  { background: var(--text-muted); }
+.check-label { font-size: .8rem; font-weight: 600; }
+.check-detail { font-size: .78rem; color: var(--text-muted); font-family: monospace;
+  background: var(--bg-secondary); padding: .3rem .5rem; border-radius: 5px;
+  word-break: break-all; margin-top: .35rem; }
+.check-fix { font-size: .77rem; color: var(--orange); margin-top: .4rem;
+  background: var(--orange-bg); padding: .3rem .55rem; border-radius: 5px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="readiness-hero">
+  <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem;">
+    <div>
+      <h1 style="margin:0;font-size:1.4rem;">Launch Readiness</h1>
+      <p style="margin:.25rem 0 0; color:var(--text-muted); font-size:.875rem;">
+        Platform production checklist — {{ readiness.environment }} environment
+      </p>
+    </div>
+    <div style="display:flex; gap:.5rem;">
+      <a href="/admin" class="btn btn-ghost btn-sm">← Admin</a>
+      <button onclick="window.location.reload()" class="btn btn-primary btn-sm">Refresh</button>
+    </div>
+  </div>
+
+  <!-- Score banner -->
+  {% set s = readiness.summary %}
+  <div class="readiness-score">
+    <div class="score-badge {% if readiness.overall == 'ready' %}ready{% elif readiness.overall == 'ready_with_warnings' %}warn{% else %}error{% endif %}">
+      {% if readiness.overall == 'ready' %}✓
+      {% elif readiness.overall == 'ready_with_warnings' %}⚠
+      {% else %}✗{% endif %}
+    </div>
+    <div class="score-meta">
+      <div class="score-label">
+        {% if readiness.overall == 'ready' %}All checks passed — ready for production
+        {% elif readiness.overall == 'ready_with_warnings' %}Ready with warnings — review before launch
+        {% else %}Not ready — resolve errors before going live{% endif %}
+      </div>
+      <div class="score-sub">
+        {{ s.total }} checks &middot; Generated {{ readiness.generated_at[:19].replace('T',' ') }} UTC
+      </div>
+      <div class="score-chips">
+        {% if s.ok %}<span class="chip chip-ok">{{ s.ok }} OK</span>{% endif %}
+        {% if s.warnings %}<span class="chip chip-warn">{{ s.warnings }} warning{% if s.warnings != 1 %}s{% endif %}</span>{% endif %}
+        {% if s.errors %}<span class="chip chip-err">{{ s.errors }} error{% if s.errors != 1 %}s{% endif %}</span>{% endif %}
+        {% if s.info %}<span class="chip chip-info">{{ s.info }} info</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Checks by category -->
+  {% for cat, items in readiness.by_category.items() %}
+  <div class="cat-section">
+    <div class="cat-title">{{ cat }}</div>
+    <div class="check-grid">
+      {% for c in items %}
+      <div class="check-card {{ c.status }}">
+        <div class="check-top">
+          <div class="check-dot dot-{{ c.status }}"></div>
+          <div class="check-label">{{ c.label }}</div>
+        </div>
+        {% if c.detail %}
+        <div class="check-detail">{{ c.detail }}</div>
+        {% endif %}
+        {% if c.fix %}
+        <div class="check-fix">{{ c.fix }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Link to Bentley diagnostics for deeper API checks -->
+  <div style="margin-top:.5rem; padding:1rem 1.25rem; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem;">
+    <div>
+      <div style="font-weight:600; font-size:.875rem;">Bentley API Diagnostics</div>
+      <div style="font-size:.78rem; color:var(--text-muted);">Test OAuth, iTwins access, webhooks, and callback URL resolution.</div>
+    </div>
+    <a href="/admin/diagnostics" class="btn btn-primary btn-sm">Open Diagnostics →</a>
+  </div>
+</div>
+{% endblock %}

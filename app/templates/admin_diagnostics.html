@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}Bentley Diagnostics — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+.diag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+@media(max-width: 900px) { .diag-grid { grid-template-columns: 1fr; } }
+
+.check-card { background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.1rem 1.25rem; }
+.check-card.ok { border-left: 4px solid var(--green); }
+.check-card.fail { border-left: 4px solid var(--red); }
+.check-card.warn { border-left: 4px solid var(--orange); }
+.check-header { display: flex; align-items: center; gap: .6rem; margin-bottom: .4rem; }
+.check-icon { font-size: 1.1rem; }
+.check-name { font-size: .75rem; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .5px; }
+.check-msg { font-weight: 600; font-size: .9rem; margin-bottom: .3rem; }
+.check-detail { font-size: .8rem; color: var(--text-muted); font-family: monospace;
+  background: var(--bg-secondary); padding: .4rem .6rem; border-radius: 6px;
+  white-space: pre-wrap; word-break: break-all; margin-top: .4rem; }
+.check-fix { font-size: .8rem; color: var(--orange); margin-top: .5rem;
+  background: var(--orange-bg); padding: .4rem .7rem; border-radius: 6px;
+  white-space: pre-wrap; }
+
+.action-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+.diag-result { margin-top: .75rem; }
+.diag-result pre { font-size: .78rem; max-height: 200px; overflow-y: auto; }
+
+.operator-card li { margin-bottom: .4rem; font-size: .875rem; }
+.curl-block { background: #0f172a; color: #e2e8f0; padding: .8rem 1rem;
+  border-radius: 8px; font-family: monospace; font-size: .75rem;
+  white-space: pre; overflow-x: auto; position: relative; margin-bottom: .75rem; }
+.curl-copy { position: absolute; top: .4rem; right: .4rem; padding: .2rem .5rem;
+  background: #334155; border: none; border-radius: 4px; color: #94a3b8;
+  cursor: pointer; font-size: .7rem; }
+.curl-copy:hover { color: #fff; }
+
+.next-action-list li { padding: .4rem 0; border-bottom: 1px solid var(--border); font-size: .875rem; }
+.next-action-list li:last-child { border: none; }
+.next-action-list li::before { content: "→ "; color: var(--primary); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Bentley Diagnostics</h1>
+    <p class="page-subtitle">Runtime checks for credentials, OAuth, API access, and security posture</p>
+  </div>
+  <div class="page-actions">
+    <a href="/admin" class="btn btn-ghost btn-sm">← Admin</a>
+    <button class="btn btn-primary btn-sm" onclick="runAllDiagnostics()">▶ Run All Checks</button>
+  </div>
+</div>
+
+<!-- Summary banner -->
+<div id="summaryBanner" class="card" style="margin-bottom: 1.25rem; padding: 1rem 1.25rem;">
+  <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+    <div>
+      <div style="font-weight: 700; font-size: 1.05rem;">
+        {% if summary.all_ok %}✅ All local checks pass{% else %}⚠️ {{ summary.failed_count }} check(s) need attention{% endif %}
+      </div>
+      <div style="color: var(--text-muted); font-size: .85rem; margin-top: .2rem;">
+        Environment: <strong>{{ summary.environment }}</strong> ·
+        Client ID: <code>{{ summary.client_id_masked }}</code> ·
+        Secret: <span style="color: {{ 'var(--green)' if summary.client_secret_present else 'var(--red)' }}">
+          {{ '✓ present' if summary.client_secret_present else '✗ missing' }}</span> ·
+        Webhook secret: <span style="color: {{ 'var(--green)' if summary.webhook_secret_present else 'var(--orange)' }}">
+          {{ '✓ present' if summary.webhook_secret_present else '✗ missing' }}</span>
+      </div>
+    </div>
+    <div style="margin-left: auto; display: flex; gap: .5rem;">
+      <button class="btn btn-primary btn-sm" onclick="testOAuth()">⚡ Test OAuth</button>
+      <button class="btn btn-ghost btn-sm" onclick="testITwins()">Test iTwins</button>
+      <button class="btn btn-ghost btn-sm" onclick="testWebhooks()">Test Webhooks</button>
+    </div>
+  </div>
+  {% if summary.production_warnings %}
+  <div style="margin-top: .75rem; background: var(--red-bg); padding: .6rem .9rem;
+    border-radius: 8px; font-size: .84rem; color: var(--red);">
+    {% for w in summary.production_warnings %}⚠ {{ w }}<br>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="diag-grid">
+
+  <!-- Static local checks -->
+  {% for check in summary.checks %}
+  <div class="check-card {{ 'ok' if check.ok else 'fail' }}">
+    <div class="check-header">
+      <span class="check-icon">{{ '✅' if check.ok else '❌' }}</span>
+      <span class="check-name">{{ check.check_name | replace('_', ' ') }}</span>
+    </div>
+    <div class="check-msg">{{ check.short_message }}</div>
+    {% if check.technical_detail %}
+    <div class="check-detail">{{ check.technical_detail }}</div>
+    {% endif %}
+    {% if not check.ok and check.recommended_fix %}
+    <div class="check-fix">{{ check.recommended_fix }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- OAuth live test -->
+  <div class="check-card" id="oauthCard" style="border-left: 4px solid var(--border);">
+    <div class="check-header">
+      <span class="check-icon" id="oauthIcon">○</span>
+      <span class="check-name">OAuth Token (live test)</span>
+    </div>
+    <div class="check-msg" id="oauthMsg">Click "Test OAuth" to run</div>
+    <div id="oauthDetail" class="check-detail" style="display:none;"></div>
+    <div id="oauthFix" class="check-fix" style="display:none;"></div>
+    <div class="action-row">
+      <button class="btn btn-primary btn-sm" onclick="testOAuth()">⚡ Test OAuth</button>
+    </div>
+  </div>
+
+  <!-- iTwins live test -->
+  <div class="check-card" id="itwinsCard" style="border-left: 4px solid var(--border);">
+    <div class="check-header">
+      <span class="check-icon" id="itwinsIcon">○</span>
+      <span class="check-name">iTwins Access (live test)</span>
+    </div>
+    <div class="check-msg" id="itwinsMsg">Click "Test iTwins" to run</div>
+    <div id="itwinsDetail" class="check-detail" style="display:none;"></div>
+    <div id="itwinsFix" class="check-fix" style="display:none;"></div>
+    <div class="action-row">
+      <button class="btn btn-ghost btn-sm" onclick="testITwins()">Test iTwins</button>
+    </div>
+  </div>
+
+  <!-- Webhooks live test -->
+  <div class="check-card" id="webhooksCard" style="border-left: 4px solid var(--border);">
+    <div class="check-header">
+      <span class="check-icon" id="webhooksIcon">○</span>
+      <span class="check-name">Webhooks Access (live test)</span>
+    </div>
+    <div class="check-msg" id="webhooksMsg">Click "Test Webhooks" to run</div>
+    <div id="webhooksDetail" class="check-detail" style="display:none;"></div>
+    <div id="webhooksFix" class="check-fix" style="display:none;"></div>
+    <div class="action-row">
+      <button class="btn btn-ghost btn-sm" onclick="testWebhooks()">Test Webhooks</button>
+    </div>
+  </div>
+
+  <!-- Callback URL -->
+  <div class="check-card {{ 'ok' if summary.callback_url and 'unknown' not in summary.callback_url else 'warn' }}">
+    <div class="check-header">
+      <span class="check-icon">🔗</span>
+      <span class="check-name">Webhook Callback URL</span>
+    </div>
+    <div class="check-msg" style="word-break: break-all;">
+      <code id="callbackUrlValue">{{ summary.callback_url }}</code>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-ghost btn-sm" onclick="_copyText(document.getElementById('callbackUrlValue').textContent, 'Callback URL')">Copy URL</button>
+      <button class="btn btn-ghost btn-sm" onclick="refreshCallbackUrl()">Refresh</button>
+    </div>
+    <div class="check-fix" style="margin-top:.5rem;">
+      Register this URL as the webhook callback in the Bentley Developer Portal.
+    </div>
+  </div>
+
+</div>
+
+<!-- Next actions -->
+{% if summary.next_actions %}
+<div class="card" style="margin-top: 1.25rem;">
+  <div class="card-header"><h2 class="card-title">Recommended Next Actions</h2></div>
+  <ul class="next-action-list">
+    {% for action in summary.next_actions %}
+    <li>{{ action }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Operator guidance -->
+<div class="card operator-card" style="margin-top: 1.25rem;">
+  <div class="card-header"><h2 class="card-title">What to request from your Bentley administrator</h2></div>
+  <ul style="padding-left: 1.25rem; list-style: disc;">
+    <li><strong>Service Application client ID</strong> — from Bentley Developer Portal → Applications</li>
+    <li><strong>Fresh client secret</strong> — generated for this Service Application</li>
+    <li><strong>Service app identity/email</strong> — needed to invite it to iTwin projects</li>
+    <li><strong>Target iTwin IDs</strong> — the iTwins this service app needs access to</li>
+    <li><strong>Confirmed iTwin access</strong> — service app must be a member of each target iTwin</li>
+    <li><strong>Confirmed webhook permissions</strong> — <code>webhooks:read</code> and <code>webhooks:modify</code> granted</li>
+  </ul>
+</div>
+
+<!-- Required Replit Secrets -->
+<div class="card" style="margin-top: 1.25rem;">
+  <div class="card-header"><h2 class="card-title">Required Replit Secrets</h2></div>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead><tr><th>Secret Name</th><th>Example / Notes</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>BENTLEY_CLIENT_ID</code></td>
+          <td>Service Application client ID from developer.bentley.com</td>
+          <td><span class="badge {{ 'badge-green' if summary.client_id_masked != '(not set)' else 'badge-red' }}">
+            {{ summary.client_id_masked }}</span></td>
+        </tr>
+        <tr>
+          <td><code>BENTLEY_CLIENT_SECRET</code></td>
+          <td>Client secret — never shown, rotated in portal</td>
+          <td><span class="badge {{ 'badge-green' if summary.client_secret_present else 'badge-red' }}">
+            {{ '✓ set' if summary.client_secret_present else '✗ missing' }}</span></td>
+        </tr>
+        <tr>
+          <td><code>WEBHOOK_SECRET</code></td>
+          <td>Random 32-char string for HMAC signature verification</td>
+          <td><span class="badge {{ 'badge-green' if summary.webhook_secret_present else 'badge-orange' }}">
+            {{ '✓ set' if summary.webhook_secret_present else '✗ missing' }}</span></td>
+        </tr>
+        <tr>
+          <td><code>SKIP_SIGNATURE_VERIFY</code></td>
+          <td>Should be <code>False</code> in production</td>
+          <td><span class="badge {{ 'badge-green' if summary.signature_verify_enabled else 'badge-orange' }}">
+            {{ 'verify ON' if summary.signature_verify_enabled else 'verify OFF' }}</span></td>
+        </tr>
+        <tr>
+          <td><code>PUBLIC_BASE_URL</code></td>
+          <td>e.g. <code>https://yourapp.replit.app</code></td>
+          <td><span class="badge badge-gray">optional but recommended</span></td>
+        </tr>
+        <tr>
+          <td><code>BENTLEY_SCOPE</code></td>
+          <td><code>itwins:read imodels:read webhooks:read webhooks:modify</code></td>
+          <td><span class="badge badge-gray">optional (has default)</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Safe curl examples -->
+<div class="card" style="margin-top: 1.25rem;">
+  <div class="card-header"><h2 class="card-title">curl Test Commands</h2>
+    <span class="text-muted text-sm">Copy and replace placeholders</span></div>
+
+  <p class="text-muted text-sm" style="margin-bottom: .75rem;">Token request:</p>
+  <div class="curl-block" id="curlToken">curl -s -X POST \
+  https://ims.bentley.com/connect/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "scope=itwins:read imodels:read webhooks:read webhooks:modify"<button class="curl-copy" onclick="_copyText(document.getElementById('curlToken').childNodes[0].textContent.trim(),'curl')">Copy</button></div>
+
+  <p class="text-muted text-sm" style="margin-bottom: .75rem;">iTwins test (replace ACCESS_TOKEN):</p>
+  <div class="curl-block" id="curlITwins">curl -s \
+  https://api.bentley.com/itwins?$top=1 \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  -H "Accept: application/vnd.bentley.itwin-platform.v1+json"<button class="curl-copy" onclick="_copyText(document.getElementById('curlITwins').childNodes[0].textContent.trim(),'curl')">Copy</button></div>
+
+  <p class="text-muted text-sm" style="margin-bottom: .75rem;">Webhooks test (replace ACCESS_TOKEN):</p>
+  <div class="curl-block" id="curlWebhooks">curl -s \
+  https://api.bentley.com/webhooks \
+  -H "Authorization: Bearer ACCESS_TOKEN" \
+  -H "Accept: application/vnd.bentley.itwin-platform.v1+json"<button class="curl-copy" onclick="_copyText(document.getElementById('curlWebhooks').childNodes[0].textContent.trim(),'curl')">Copy</button></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyResult(prefix, data) {
+  const card = document.getElementById(prefix + 'Card');
+  const icon = document.getElementById(prefix + 'Icon');
+  const msg = document.getElementById(prefix + 'Msg');
+  const detail = document.getElementById(prefix + 'Detail');
+  const fix = document.getElementById(prefix + 'Fix');
+  if (!card) return;
+  card.style.borderLeftColor = data.ok ? 'var(--green)' : 'var(--red)';
+  icon.textContent = data.ok ? '✅' : '❌';
+  msg.textContent = data.short_message;
+  if (data.technical_detail) {
+    detail.textContent = data.technical_detail;
+    detail.style.display = '';
+  }
+  if (!data.ok && data.recommended_fix) {
+    fix.textContent = data.recommended_fix;
+    fix.style.display = '';
+  } else {
+    fix.style.display = 'none';
+  }
+  window._showToast && window._showToast(
+    (data.ok ? '✓ ' : '✗ ') + data.short_message.slice(0, 80),
+    data.ok ? 'success' : 'error',
+    4000
+  );
+}
+
+async function testOAuth() {
+  document.getElementById('oauthMsg').textContent = 'Testing…';
+  document.getElementById('oauthIcon').textContent = '⏳';
+  try {
+    const res = await fetch('/api/admin/diagnostics/test-oauth', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    applyResult('oauth', await res.json());
+  } catch(e) { document.getElementById('oauthMsg').textContent = 'Request failed: ' + e.message; }
+}
+
+async function testITwins() {
+  document.getElementById('itwinsMsg').textContent = 'Testing…';
+  document.getElementById('itwinsIcon').textContent = '⏳';
+  try {
+    const res = await fetch('/api/admin/diagnostics/test-itwins', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    applyResult('itwins', await res.json());
+  } catch(e) { document.getElementById('itwinsMsg').textContent = 'Request failed: ' + e.message; }
+}
+
+async function testWebhooks() {
+  document.getElementById('webhooksMsg').textContent = 'Testing…';
+  document.getElementById('webhooksIcon').textContent = '⏳';
+  try {
+    const res = await fetch('/api/admin/diagnostics/test-webhooks', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    applyResult('webhooks', await res.json());
+  } catch(e) { document.getElementById('webhooksMsg').textContent = 'Request failed: ' + e.message; }
+}
+
+async function runAllDiagnostics() {
+  await testOAuth();
+  await testITwins();
+  await testWebhooks();
+}
+
+async function refreshCallbackUrl() {
+  const res = await fetch('/api/admin/diagnostics/callback-url');
+  const d = await res.json();
+  document.getElementById('callbackUrlValue').textContent = d.short_message;
+}
+</script>
+{% endblock %}
