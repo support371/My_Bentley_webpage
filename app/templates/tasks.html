@@ -1,0 +1,621 @@
+{% extends "base.html" %}
+{% block title %}Task Pipeline — {{ app_name }}{% endblock %}
+
+{% block head %}
+<style>
+/* ── Layout ─────────────────────────────────────────────── */
+.pipeline-wrap { display:flex; gap:1rem; overflow-x:auto; padding-bottom:1.5rem;
+  align-items:flex-start; }
+.pipeline-col { flex:0 0 220px; min-width:200px; }
+.pipeline-col-head { display:flex; align-items:center; justify-content:space-between;
+  padding:.55rem .75rem; border-radius:8px 8px 0 0;
+  background:var(--bg-secondary); border:1px solid var(--border); border-bottom:none;
+  font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--text-muted); }
+.pipeline-col-head .col-count { background:var(--primary); color:#fff;
+  border-radius:20px; padding:.05rem .5rem; font-size:.7rem; font-weight:700; }
+.pipeline-col-body { min-height:160px; padding:.5rem; border:1px solid var(--border);
+  border-radius:0 0 8px 8px; background:var(--bg-card); display:flex; flex-direction:column; gap:.5rem; }
+/* task card */
+.task-card { padding:.65rem .75rem; border-radius:8px; background:var(--bg);
+  border:1px solid var(--border); cursor:pointer; transition:box-shadow var(--transition);
+  user-select:none; }
+.task-card:hover { box-shadow:var(--shadow-md); border-color:var(--primary); }
+.task-card.dragging { opacity:.4; }
+.task-card-id { font-size:.68rem; color:var(--text-muted); font-family:'SF Mono',monospace; }
+.task-card-title { font-size:.83rem; font-weight:600; color:var(--text-primary);
+  margin:.15rem 0 .35rem; line-height:1.3; }
+.task-card-meta { display:flex; align-items:center; gap:.3rem; flex-wrap:wrap; }
+/* priority badges */
+.pri { display:inline-block; padding:.08rem .45rem; border-radius:10px;
+  font-size:.65rem; font-weight:700; }
+.pri-critical { background:#fef2f2; color:#991b1b; }
+.pri-high     { background:#fff7ed; color:#9a3412; }
+.pri-medium   { background:#eff6ff; color:#1e40af; }
+.pri-low      { background:#f0fdf4; color:#166534; }
+[data-theme="dark"] .pri-critical { background:#7f1d1d44; color:#fca5a5; }
+[data-theme="dark"] .pri-high     { background:#7c2d1244; color:#fdba74; }
+[data-theme="dark"] .pri-medium   { background:#1e3a8a44; color:#93c5fd; }
+[data-theme="dark"] .pri-low      { background:#14532d44; color:#86efac; }
+.tag-chip { display:inline-block; padding:.05rem .4rem; border-radius:8px;
+  font-size:.63rem; background:var(--bg-secondary); color:var(--text-muted); border:1px solid var(--border); }
+/* stats bar */
+.pipeline-stats { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.stat-pill { padding:.35rem .85rem; border-radius:20px; background:var(--bg-card);
+  border:1px solid var(--border); font-size:.8rem; color:var(--text-secondary);
+  display:flex; align-items:center; gap:.4rem; }
+.stat-pill strong { color:var(--text-primary); }
+.progress-bar-wrap { flex:1; min-width:160px; display:flex; align-items:center; gap:.6rem;
+  padding:.35rem .85rem; border-radius:20px; background:var(--bg-card); border:1px solid var(--border); }
+.progress-bar-track { flex:1; height:6px; border-radius:3px; background:var(--border); }
+.progress-bar-fill { height:6px; border-radius:3px; background:var(--green); transition:width .4s; }
+/* toolbar */
+.pipeline-toolbar { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+.pipe-search { flex:1; min-width:180px; max-width:280px; padding:.45rem .85rem;
+  border-radius:8px; border:1px solid var(--border); background:var(--bg-card);
+  color:var(--text-primary); font-size:.85rem; }
+.pipe-search:focus { outline:none; border-color:var(--primary); }
+.pipe-select { padding:.42rem .7rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg-card); color:var(--text-primary); font-size:.83rem; cursor:pointer; }
+.view-btn { padding:.35rem .7rem; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg-card); cursor:pointer; font-size:.8rem; color:var(--text-muted); }
+.view-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+
+/* ── List view ───────────────────────────────────────────── */
+.task-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.task-table th { text-align:left; padding:.55rem .75rem; font-size:.72rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);
+  border-bottom:1px solid var(--border); background:var(--bg-secondary); }
+.task-table td { padding:.6rem .75rem; border-bottom:1px solid var(--border); color:var(--text-primary); }
+.task-table tr:hover td { background:var(--bg-secondary); cursor:pointer; }
+.stage-badge { display:inline-block; padding:.12rem .55rem; border-radius:10px;
+  font-size:.7rem; font-weight:600; background:var(--bg-secondary); color:var(--text-muted); }
+.stage-badge.registration  { background:#ede9fe; color:#7c3aed; }
+.stage-badge.planning      { background:#fff7ed; color:#c2410c; }
+.stage-badge.development   { background:#eff6ff; color:#1d4ed8; }
+.stage-badge.review        { background:#fefce8; color:#854d0e; }
+.stage-badge.testing       { background:#f0fdf4; color:#15803d; }
+.stage-badge.deployment    { background:#ecfdf5; color:#065f46; }
+.stage-badge.complete      { background:#dcfce7; color:#14532d; }
+[data-theme="dark"] .stage-badge.registration { background:#3b0764aa; color:#c4b5fd; }
+[data-theme="dark"] .stage-badge.planning     { background:#7c2d1244; color:#fdba74; }
+[data-theme="dark"] .stage-badge.development  { background:#1e3a8a44; color:#93c5fd; }
+[data-theme="dark"] .stage-badge.review       { background:#78350f44; color:#fde68a; }
+[data-theme="dark"] .stage-badge.testing      { background:#14532d44; color:#86efac; }
+[data-theme="dark"] .stage-badge.deployment   { background:#064e3b44; color:#6ee7b7; }
+[data-theme="dark"] .stage-badge.complete     { background:#14532d44; color:#4ade80; }
+
+/* ── Drawer ──────────────────────────────────────────────── */
+.drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:300;
+  display:none; }
+.drawer-overlay.open { display:block; }
+.drawer { position:fixed; top:0; right:-480px; width:460px; max-width:95vw; height:100vh;
+  background:var(--bg-card); border-left:1px solid var(--border); z-index:301;
+  overflow-y:auto; transition:right .25s ease; box-shadow:var(--shadow-md); }
+.drawer.open { right:0; }
+.drawer-head { display:flex; align-items:center; justify-content:space-between;
+  padding:1rem 1.25rem; border-bottom:1px solid var(--border); position:sticky; top:0;
+  background:var(--bg-card); z-index:1; }
+.drawer-head h3 { font-size:1rem; font-weight:700; }
+.drawer-body { padding:1.25rem; display:flex; flex-direction:column; gap:1rem; }
+.field-label { font-size:.75rem; font-weight:600; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:.04em; margin-bottom:.3rem; }
+.field-val { font-size:.9rem; color:var(--text-primary); }
+.stage-select-row { display:flex; gap:.4rem; flex-wrap:wrap; }
+.stage-btn { padding:.3rem .65rem; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg-secondary); font-size:.75rem; cursor:pointer; color:var(--text-muted);
+  transition:all var(--transition); }
+.stage-btn:hover { border-color:var(--primary); color:var(--primary); }
+.stage-btn.current { background:var(--primary); border-color:var(--primary);
+  color:#fff; font-weight:700; }
+.comment-item { padding:.5rem .65rem; border-radius:6px; background:var(--bg-secondary);
+  font-size:.8rem; color:var(--text-secondary); line-height:1.5; border-left:2px solid var(--primary); }
+.comment-form { display:flex; gap:.5rem; }
+.comment-input { flex:1; padding:.45rem .75rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg); color:var(--text-primary); font-size:.83rem; }
+.comment-input:focus { outline:none; border-color:var(--primary); }
+
+/* ── Create modal ───────────────────────────────────────── */
+.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:400;
+  display:flex; align-items:center; justify-content:center; display:none; }
+.modal-backdrop.open { display:flex; }
+.modal-box { background:var(--bg-card); border-radius:12px; border:1px solid var(--border);
+  width:420px; max-width:95vw; padding:1.5rem; box-shadow:var(--shadow-md); }
+.modal-box h3 { font-size:1rem; font-weight:700; margin-bottom:1rem; }
+.form-group { display:flex; flex-direction:column; gap:.3rem; margin-bottom:.85rem; }
+.form-label { font-size:.78rem; font-weight:600; color:var(--text-muted); }
+.form-input, .form-select, .form-textarea {
+  padding:.5rem .75rem; border-radius:8px; border:1px solid var(--border);
+  background:var(--bg); color:var(--text-primary); font-size:.875rem; font-family:inherit; }
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline:none; border-color:var(--primary); }
+.form-textarea { resize:vertical; min-height:80px; }
+.modal-actions { display:flex; justify-content:flex-end; gap:.5rem; margin-top:1rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Task Pipeline</h1>
+    <p class="page-subtitle">Project delivery workflow — drag cards between stages</p>
+  </div>
+  <div class="page-actions">
+    <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+    <button class="btn btn-primary btn-sm" onclick="openCreateModal()">+ New Task</button>
+  </div>
+</div>
+
+<!-- Stats bar -->
+<div class="pipeline-stats" id="statsBar">
+  <div class="stat-pill"><strong id="statTotal">—</strong> total</div>
+  <div class="stat-pill"><strong id="statComplete">—</strong> complete</div>
+  <div class="progress-bar-wrap">
+    <span style="font-size:.78rem;color:var(--text-muted)">Progress</span>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+    <span style="font-size:.78rem;color:var(--text-muted)" id="progressPct">0%</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="pipeline-toolbar">
+  <input type="search" class="pipe-search" id="searchInput" placeholder="Search tasks…" oninput="applyFilters()">
+  <select class="pipe-select" id="priFilter" onchange="applyFilters()">
+    <option value="">All Priorities</option>
+    <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+  </select>
+  <select class="pipe-select" id="stageFilter" onchange="applyFilters()">
+    <option value="">All Stages</option>
+    {% for s in stages %}<option value="{{ s }}">{{ s|title }}</option>{% endfor %}
+  </select>
+  <div style="margin-left:auto;display:flex;gap:.4rem;">
+    <button class="view-btn active" id="btnKanban" onclick="setView('kanban',this)">⊞ Kanban</button>
+    <button class="view-btn" id="btnList" onclick="setView('list',this)">≡ List</button>
+  </div>
+</div>
+
+<!-- Kanban board -->
+<div class="pipeline-wrap" id="kanbanView">
+  {% for s in stages %}
+  <div class="pipeline-col" id="col-{{ s }}"
+       ondragover="ev.preventDefault()" ondrop="onDrop(event,'{{ s }}')">
+    <div class="pipeline-col-head">
+      <span>{{ s|title }}</span>
+      <span class="col-count" id="cnt-{{ s }}">0</span>
+    </div>
+    <div class="pipeline-col-body" id="body-{{ s }}"></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- List view -->
+<div id="listView" style="display:none;" class="card" style="padding:0;overflow:hidden;">
+  <table class="task-table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Title</th><th>Stage</th><th>Priority</th>
+        <th>Assignee</th><th>Created</th>
+      </tr>
+    </thead>
+    <tbody id="listBody"></tbody>
+  </table>
+</div>
+
+<!-- Detail drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h3 id="drawerTitle">Task</h3>
+    <button class="btn btn-ghost btn-sm" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<!-- Create task modal -->
+<div class="modal-backdrop" id="createModal" onclick="if(event.target===this)closeCreateModal()">
+  <div class="modal-box">
+    <h3>New Task</h3>
+    <div class="form-group">
+      <label class="form-label">Title *</label>
+      <input class="form-input" id="newTitle" placeholder="Task title…">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="newDesc" placeholder="Optional details…"></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+      <div class="form-group">
+        <label class="form-label">Stage</label>
+        <select class="form-select" id="newStage">
+          {% for s in stages %}<option value="{{ s }}">{{ s|title }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Priority</label>
+        <select class="form-select" id="newPriority">
+          <option>Critical</option><option>High</option>
+          <option selected>Medium</option><option>Low</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Assignee</label>
+      <input class="form-input" id="newAssignee" placeholder="e.g. Gregor S.">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tags (comma-separated)</label>
+      <input class="form-input" id="newTags" placeholder="e.g. backend, api">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="submitCreate()">Create Task</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STAGES = {{ stages | tojson }};
+const PRI_CLASS = { Critical:'pri-critical', High:'pri-high', Medium:'pri-medium', Low:'pri-low' };
+
+let allTasks = [];
+let currentView = 'kanban';
+let drawerTaskId = null;
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Data ───────────────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadStats(), loadTasks()]);
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/api/tasks/pipeline-stats');
+    const d = await r.json();
+    document.getElementById('statTotal').textContent = d.total;
+    document.getElementById('statComplete').textContent = d.complete;
+    document.getElementById('progressFill').style.width = d.completion_pct + '%';
+    document.getElementById('progressPct').textContent = d.completion_pct + '%';
+    STAGES.forEach(s => {
+      const el = document.getElementById('cnt-' + s);
+      if (el) el.textContent = d.stage_counts[s] || 0;
+    });
+  } catch(e) { console.error('stats', e); }
+}
+
+async function loadTasks() {
+  try {
+    const r = await fetch('/api/tasks');
+    const d = await r.json();
+    allTasks = d.tasks || [];
+    applyFilters();
+  } catch(e) {
+    showToast('Failed to load tasks', 'error');
+  }
+}
+
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const pri    = document.getElementById('priFilter').value;
+  const stage  = document.getElementById('stageFilter').value;
+  let tasks = allTasks;
+  if (search) tasks = tasks.filter(t => t.title.toLowerCase().includes(search) || (t.desc||'').toLowerCase().includes(search));
+  if (pri)   tasks = tasks.filter(t => t.priority === pri);
+  if (stage) tasks = tasks.filter(t => t.stage === stage);
+  if (currentView === 'kanban') renderKanban(tasks);
+  else renderList(tasks);
+}
+
+// ── Kanban ─────────────────────────────────────────────────────────
+function renderKanban(tasks) {
+  STAGES.forEach(s => {
+    const body = document.getElementById('body-' + s);
+    if (!body) return;
+    const cols = tasks.filter(t => t.stage === s);
+    if (!cols.length) {
+      body.innerHTML = '<div style="font-size:.75rem;color:var(--text-muted);text-align:center;padding:.75rem 0;">Empty</div>';
+      return;
+    }
+    body.innerHTML = cols.map(t => taskCardHTML(t)).join('');
+  });
+}
+
+function taskCardHTML(t) {
+  const tagsHtml = (t.tags||[]).map(tag => `<span class="tag-chip">${esc(tag)}</span>`).join('');
+  return `<div class="task-card" id="card-${t.id}" draggable="true"
+    ondragstart="onDragStart(event,'${t.id}')"
+    onclick="openDrawer('${t.id}')">
+    <div class="task-card-id">${esc(t.id)}</div>
+    <div class="task-card-title">${esc(t.title)}</div>
+    <div class="task-card-meta">
+      <span class="pri ${PRI_CLASS[t.priority]||'pri-medium'}">${esc(t.priority)}</span>
+      ${tagsHtml}
+    </div>
+    ${t.assignee ? `<div style="font-size:.7rem;color:var(--text-muted);margin-top:.3rem;">◎ ${esc(t.assignee)}</div>` : ''}
+  </div>`;
+}
+
+// ── List view ───────────────────────────────────────────────────────
+function renderList(tasks) {
+  const tbody = document.getElementById('listBody');
+  if (!tasks.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">No tasks found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = tasks.map(t => `
+    <tr onclick="openDrawer('${t.id}')">
+      <td><code style="font-size:.75rem">${esc(t.id)}</code></td>
+      <td style="font-weight:500">${esc(t.title)}</td>
+      <td><span class="stage-badge ${t.stage}">${esc(t.stage)}</span></td>
+      <td><span class="pri ${PRI_CLASS[t.priority]||'pri-medium'}">${esc(t.priority)}</span></td>
+      <td>${esc(t.assignee||'—')}</td>
+      <td style="color:var(--text-muted);font-size:.8rem">${esc(t.created||'—')}</td>
+    </tr>`).join('');
+}
+
+function setView(v, btn) {
+  currentView = v;
+  document.getElementById('kanbanView').style.display = v === 'kanban' ? 'flex' : 'none';
+  document.getElementById('listView').style.display   = v === 'list'   ? 'block' : 'none';
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ── Drag & drop ────────────────────────────────────────────────────
+let _dragId = null;
+function onDragStart(ev, id) {
+  _dragId = id;
+  ev.dataTransfer.effectAllowed = 'move';
+  document.getElementById('card-' + id)?.classList.add('dragging');
+}
+function onDrop(ev, stage) {
+  ev.preventDefault();
+  if (!_dragId) return;
+  document.getElementById('card-' + _dragId)?.classList.remove('dragging');
+  const task = allTasks.find(t => t.id === _dragId);
+  if (!task || task.stage === stage) { _dragId = null; return; }
+  moveTaskStage(_dragId, stage);
+  _dragId = null;
+}
+async function moveTaskStage(id, stage) {
+  try {
+    const r = await fetch(`/api/tasks/${id}/stage`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({stage})
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const updated = await r.json();
+    const idx = allTasks.findIndex(t => t.id === id);
+    if (idx >= 0) allTasks[idx] = updated;
+    await loadStats();
+    applyFilters();
+    showToast(`${id} → ${stage}`, 'success');
+  } catch(e) {
+    showToast('Stage update failed', 'error');
+  }
+}
+
+// ── Drawer ─────────────────────────────────────────────────────────
+async function openDrawer(id) {
+  drawerTaskId = id;
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  const task = allTasks.find(t => t.id === id);
+  if (task) renderDrawer(task);
+  try {
+    const r = await fetch(`/api/tasks/${id}`);
+    const t = await r.json();
+    renderDrawer(t);
+  } catch(e) {}
+}
+
+function renderDrawer(t) {
+  document.getElementById('drawerTitle').textContent = `${t.id} — ${t.title}`;
+  const tagsHtml = (t.tags||[]).map(tag => `<span class="tag-chip">${esc(tag)}</span>`).join(' ');
+  const stageButtons = STAGES.map(s =>
+    `<button class="stage-btn ${t.stage===s?'current':''}" onclick="drawerSetStage('${s}')">${s}</button>`
+  ).join('');
+  const commentsHtml = (t.comments||[]).map(c =>
+    `<div class="comment-item">${esc(c)}</div>`
+  ).join('') || '<div style="color:var(--text-muted);font-size:.8rem">No comments yet.</div>';
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div>
+      <div class="field-label">Description</div>
+      <div class="field-val">${esc(t.desc||'—')}</div>
+    </div>
+    <div>
+      <div class="field-label">Priority</div>
+      <span class="pri ${PRI_CLASS[t.priority]||'pri-medium'}">${esc(t.priority)}</span>
+    </div>
+    <div>
+      <div class="field-label">Assignee</div>
+      <div class="field-val">${esc(t.assignee||'—')}</div>
+    </div>
+    <div>
+      <div class="field-label">Tags</div>
+      <div>${tagsHtml||'<span style="color:var(--text-muted);font-size:.8rem">None</span>'}</div>
+    </div>
+    <div>
+      <div class="field-label">Stage — click to move</div>
+      <div class="stage-select-row">${stageButtons}</div>
+    </div>
+    <div>
+      <div class="field-label">Created ${esc(t.created||'')} ${t.updated ? '· Updated '+esc(t.updated) : ''}</div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border)">
+    <div>
+      <div class="field-label" style="margin-bottom:.5rem">Comments</div>
+      <div id="commentsList" style="display:flex;flex-direction:column;gap:.4rem">${commentsHtml}</div>
+    </div>
+    <div class="comment-form">
+      <input class="comment-input" id="commentInput" placeholder="Add a comment…"
+        onkeydown="if(event.key==='Enter')submitComment()">
+      <button class="btn btn-sm btn-primary" onclick="submitComment()">Post</button>
+    </div>
+    <div style="display:flex;gap:.5rem;padding-top:.25rem">
+      <button class="btn btn-sm btn-ghost" onclick="openEditModal('${t.id}')">Edit</button>
+      <button class="btn btn-sm btn-ghost" style="color:var(--red)"
+        onclick="deleteTask('${t.id}')">Delete</button>
+    </div>
+  `;
+}
+
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+  drawerTaskId = null;
+}
+
+async function drawerSetStage(stage) {
+  if (!drawerTaskId) return;
+  await moveTaskStage(drawerTaskId, stage);
+  const task = allTasks.find(t => t.id === drawerTaskId);
+  if (task) renderDrawer(task);
+}
+
+async function submitComment() {
+  if (!drawerTaskId) return;
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    const r = await fetch(`/api/tasks/${drawerTaskId}/comments`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    const d = await r.json();
+    input.value = '';
+    const list = document.getElementById('commentsList');
+    if (list) {
+      list.innerHTML = d.comments.map(c => `<div class="comment-item">${esc(c)}</div>`).join('')
+        || '<div style="color:var(--text-muted);font-size:.8rem">No comments yet.</div>';
+    }
+  } catch(e) { showToast('Comment failed', 'error'); }
+}
+
+// ── Create modal ───────────────────────────────────────────────────
+function openCreateModal() {
+  document.getElementById('createModal').classList.add('open');
+  document.getElementById('newTitle').focus();
+}
+function closeCreateModal() {
+  document.getElementById('createModal').classList.remove('open');
+  ['newTitle','newDesc','newAssignee','newTags'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+async function submitCreate() {
+  const title = document.getElementById('newTitle').value.trim();
+  if (!title) { showToast('Title is required', 'error'); return; }
+  const tagsRaw = document.getElementById('newTags').value;
+  const tags = tagsRaw.split(',').map(t=>t.trim()).filter(Boolean);
+  try {
+    const r = await fetch('/api/tasks', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        title,
+        desc:  document.getElementById('newDesc').value,
+        stage: document.getElementById('newStage').value,
+        priority: document.getElementById('newPriority').value,
+        assignee: document.getElementById('newAssignee').value,
+        tags,
+      })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const t = await r.json();
+    allTasks.unshift(t);
+    closeCreateModal();
+    await loadStats();
+    applyFilters();
+    showToast(`${t.id} created`, 'success');
+  } catch(e) {
+    showToast('Create failed: ' + e.message, 'error');
+  }
+}
+
+// ── Delete ────────────────────────────────────────────────────────
+async function deleteTask(id) {
+  if (!confirm(`Delete ${id}? This cannot be undone.`)) return;
+  try {
+    await fetch(`/api/tasks/${id}`, {method:'DELETE'});
+    allTasks = allTasks.filter(t => t.id !== id);
+    closeDrawer();
+    await loadStats();
+    applyFilters();
+    showToast(`${id} deleted`, 'success');
+  } catch(e) { showToast('Delete failed', 'error'); }
+}
+
+// ── Edit (inline quick modal reuse) ──────────────────────────────
+function openEditModal(id) {
+  const task = allTasks.find(t => t.id === id);
+  if (!task) return;
+  document.getElementById('newTitle').value = task.title;
+  document.getElementById('newDesc').value  = task.desc || '';
+  document.getElementById('newStage').value = task.stage;
+  document.getElementById('newPriority').value = task.priority;
+  document.getElementById('newAssignee').value = task.assignee || '';
+  document.getElementById('newTags').value = (task.tags||[]).join(', ');
+  const modal = document.getElementById('createModal');
+  modal.querySelector('h3').textContent = 'Edit Task';
+  // swap button
+  const btn = modal.querySelector('[onclick="submitCreate()"]');
+  btn.textContent = 'Save Changes';
+  btn.setAttribute('onclick', `submitEdit('${id}')`);
+  modal.classList.add('open');
+}
+
+async function submitEdit(id) {
+  const title = document.getElementById('newTitle').value.trim();
+  if (!title) { showToast('Title is required', 'error'); return; }
+  const tagsRaw = document.getElementById('newTags').value;
+  const tags = tagsRaw.split(',').map(t=>t.trim()).filter(Boolean);
+  try {
+    const r = await fetch(`/api/tasks/${id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        title, desc: document.getElementById('newDesc').value,
+        stage: document.getElementById('newStage').value,
+        priority: document.getElementById('newPriority').value,
+        assignee: document.getElementById('newAssignee').value,
+        tags,
+      })
+    });
+    const updated = await r.json();
+    const idx = allTasks.findIndex(t => t.id === id);
+    if (idx >= 0) allTasks[idx] = updated;
+    // restore modal state
+    document.getElementById('createModal').querySelector('h3').textContent = 'New Task';
+    const btn = document.getElementById('createModal').querySelector(`[onclick="submitEdit('${id}')"]`);
+    if (btn) { btn.textContent = 'Create Task'; btn.setAttribute('onclick','submitCreate()'); }
+    closeCreateModal();
+    applyFilters();
+    if (drawerTaskId === id) renderDrawer(updated);
+    showToast(`${id} updated`, 'success');
+  } catch(e) { showToast('Update failed', 'error'); }
+}
+
+// ── Toast ──────────────────────────────────────────────────────────
+function showToast(msg, type='info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.style.cssText = `
+    padding:.55rem 1rem; border-radius:8px; font-size:.83rem; pointer-events:auto;
+    background:${type==='success'?'var(--green)':type==='error'?'var(--red)':'var(--primary)'};
+    color:#fff; box-shadow:var(--shadow-md); animation:fadeIn .2s ease;`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+loadAll();
+</script>
+{% endblock %}
