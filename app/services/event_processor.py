@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -140,27 +140,27 @@ async def upsert_itwin(session: AsyncSession, itwin_id: str, name: str, tenant_i
     result = await session.execute(select(ITwin).where(ITwin.id == itwin_id))
     existing = result.scalars().first()
     if existing:
-        existing.last_event_at = datetime.utcnow()
+        existing.last_event_at = datetime.now(timezone.utc)
         if name and not existing.display_name:
             existing.display_name = name
     else:
-        session.add(ITwin(id=itwin_id, display_name=name, tenant_id=tenant_id, last_event_at=datetime.utcnow()))
+        session.add(ITwin(id=itwin_id, display_name=name, tenant_id=tenant_id, last_event_at=datetime.now(timezone.utc)))
 
 
 async def upsert_imodel(session: AsyncSession, imodel_id: str, itwin_id: str, name: str, tenant_id: Optional[str]):
     result = await session.execute(select(IModel).where(IModel.id == imodel_id))
     existing = result.scalars().first()
     if existing:
-        existing.last_event_at = datetime.utcnow()
+        existing.last_event_at = datetime.now(timezone.utc)
         if name and not existing.display_name:
             existing.display_name = name
     else:
-        session.add(IModel(id=imodel_id, itwin_id=itwin_id, display_name=name, tenant_id=tenant_id, last_event_at=datetime.utcnow()))
+        session.add(IModel(id=imodel_id, itwin_id=itwin_id, display_name=name, tenant_id=tenant_id, last_event_at=datetime.now(timezone.utc)))
 
 
 async def get_dashboard_stats(session: AsyncSession, hours: int = 24) -> dict:
     from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
     total = await session.scalar(
         select(func.count(Event.id)).where(Event.received_at >= cutoff)

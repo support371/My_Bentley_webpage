@@ -219,4 +219,4 @@ class TestOAuthClassification:
                 mock_client_cls.return_value = mock_client
                 r = await test_oauth_token("some-id", "some-secret")
         assert r["ok"] is False
-        assert "timeout" in r["short_message"].lower()
+        assert "timed out" in r["short_message"].lower()

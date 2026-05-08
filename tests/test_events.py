@@ -3,7 +3,7 @@ import pytest
 
 @pytest.mark.anyio
 async def test_events_empty(client):
-    resp = await client.get("/events")
+    resp = await client.get("/api/events")
     assert resp.status_code == 200
     data = resp.json()
     assert "events" in data
@@ -15,7 +15,7 @@ async def test_events_empty(client):
 async def test_events_pagination(client):
     for i in range(5):
         await client.post("/webhook", json={"eventType": f"test.event{i}.v1"})
-    resp = await client.get("/events?page=1&page_size=3")
+    resp = await client.get("/api/events?page=1&page_size=3")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["events"]) <= 3
@@ -25,7 +25,7 @@ async def test_events_pagination(client):
 async def test_event_detail(client):
     r1 = await client.post("/webhook", json={"eventType": "iModels.iModelDeleted.v1"})
     event_id = r1.json()["event_id"]
-    r2 = await client.get(f"/events/{event_id}")
+    r2 = await client.get(f"/api/events/{event_id}")
     assert r2.status_code == 200
     data = r2.json()
     assert data["id"] == event_id
@@ -34,7 +34,7 @@ async def test_event_detail(client):
 
 @pytest.mark.anyio
 async def test_event_not_found(client):
-    resp = await client.get("/events/nonexistent-id-12345")
+    resp = await client.get("/api/events/nonexistent-id-12345")
     assert resp.status_code == 404
 
 

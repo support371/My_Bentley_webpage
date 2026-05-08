@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}{{ env_title }} Environment - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="/control-plane">Control Plane</a></li>
+                <li class="breadcrumb-item active">{{ env_title }}</li>
+              </ol>
+            </nav>
+            <h1 class="h3 mb-0">{{ env_title }} Environment</h1>
+            <p class="text-muted">Specific configurations and status for the {{ env_name }} environment.</p>
+        </div>
+        <div>
+            <span class="badge bg-success rounded-pill px-3 py-2">Operational</span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Resource Allocation</h6>
+                    <div class="d-flex align-items-end gap-2 mb-2">
+                        <h2 class="mb-0">84%</h2>
+                        <span class="text-success small mb-1">↑ 2%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                      <div class="progress-bar bg-primary" role="progressbar" style="width: 84%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Active Services</h6>
+                    <div class="d-flex align-items-end gap-2 mb-2">
+                        <h2 class="mb-0">24</h2>
+                    </div>
+                    <p class="small text-muted mb-0">All systems performing within SLA</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h6 class="text-muted text-uppercase small fw-bold mb-3">Deployment Velocity</h6>
+                    <div class="d-flex align-items-end gap-2 mb-2">
+                        <h2 class="mb-0">12.5</h2>
+                        <span class="text-muted small mb-1">deploys / day</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

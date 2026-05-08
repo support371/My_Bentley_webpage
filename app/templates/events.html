@@ -31,7 +31,7 @@
     <label style="font-size:.8rem;color:var(--text-muted);display:flex;align-items:center;gap:.35rem;cursor:pointer;">
       <input type="checkbox" id="autoRefreshToggle" onchange="toggleAutoRefresh()"> Live
     </label>
-    <a href="/events/export" class="btn btn-ghost btn-sm export-btn" target="_blank">📥 Export CSV</a>
+    <a href="/api/events/export" class="btn btn-ghost btn-sm export-btn" target="_blank">📥 Export CSV</a>
     <button class="btn btn-primary btn-sm" onclick="loadEvents()">↻ Refresh</button>
   </div>
 </div>
@@ -186,7 +186,7 @@ function removeFilter(key) {
 }
 
 async function loadEvents() {
-  let url = `/events?page=${page}&page_size=50`;
+  let url = `/api/events?page=${page}&page_size=50`;
   for (const [k, v] of Object.entries(activeFilters)) {
     url += `&${k}=${encodeURIComponent(v)}`;
   }
@@ -247,7 +247,7 @@ function toggleAutoRefresh() {
 }
 
 async function viewEvent(id) {
-  const res = await fetch('/events/' + id);
+  const res = await fetch('/api/events/' + id);
   const d = await res.json();
   currentEventData = d;
   document.getElementById('modalTitle').textContent = d.event_type;

@@ -1,13 +1,22 @@
 import json
 import logging
+import random
+import json
+import string
+from datetime import datetime, timedelta
+from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy import select
 
 from app.db.database import AsyncSessionLocal
 from app.models.auth import User
 from app.models.tenants import Tenant
+from app.models.resources import ITwin, IModel, AlertRule
+from app.models.events import Event, WebhookDelivery
+from app.models.integrations import Integration
+from app.models.ops import ControlPlaneModule, LaunchCheck
 from app.core.security import hash_password
 from app.core.config import settings
+from app.api.routes.integrations import INTEGRATION_CATALOG
 
 logger = logging.getLogger("itwin_ops.seed")
 
@@ -46,16 +55,16 @@ async def seed_tasks(session: AsyncSession) -> None:
 
 async def seed_initial_data():
     async with AsyncSessionLocal() as session:
+        # Check if already seeded
         result = await session.execute(select(Tenant).limit(1))
         if result.scalars().first():
             await seed_tasks(session)
             return
 
-        default_tenant = Tenant(
-            name="Default Organization",
-            slug="default",
-            is_active=True,
-        )
+        logger.info("Seeding initial data...")
+
+        # 1. Tenant & Admin
+        default_tenant = Tenant(name="Bentley Operations", slug="bentley", is_active=True)
         session.add(default_tenant)
         await session.commit()
         await session.refresh(default_tenant)
@@ -68,7 +77,6 @@ async def seed_initial_data():
             tenant_id=default_tenant.id,
         )
         session.add(admin_user)
-        await session.commit()
 
         await seed_tasks(session)
         logger.info(f"Seeded default tenant and admin user: {settings.INITIAL_ADMIN_EMAIL}")

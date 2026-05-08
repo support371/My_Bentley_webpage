@@ -1,9 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
 class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     event_type: str
     event_category: str
@@ -15,9 +17,6 @@ class EventOut(BaseModel):
     processing_status: str
     received_at: datetime
     event_timestamp: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class EventsResponse(BaseModel):

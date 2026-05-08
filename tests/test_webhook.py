@@ -43,7 +43,7 @@ async def test_webhook_empty_body(client):
 async def test_events_endpoint_after_webhook(client):
     payload = {"eventType": "iTwins.iTwinCreated.v1", "content": {"iTwinId": "tw-999"}}
     await client.post("/webhook", json=payload)
-    resp = await client.get("/events")
+    resp = await client.get("/api/events")
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 1

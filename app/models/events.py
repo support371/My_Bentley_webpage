@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, Field, Column
 from sqlalchemy import Text
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 
@@ -52,4 +52,4 @@ class AuditLog(SQLModel, table=True):
     resource_id: Optional[str] = None
     detail: Optional[str] = Field(default=None, sa_column=Column(Text))
     ip_address: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

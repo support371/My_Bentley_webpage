@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Infrastructure Console - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="/control-plane">Control Plane</a></li>
+                <li class="breadcrumb-item active">Infrastructure</li>
+              </ol>
+            </nav>
+            <h1 class="h3 mb-0">Infrastructure Console</h1>
+            <p class="text-muted">Global cluster management and resource monitoring.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-secondary btn-sm me-2">Security Scan</button>
+            <button class="btn btn-primary btn-sm">Provision Resource</button>
+        </div>
+    </div>
+
+    <!-- Metrics Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-3">
+                    <small class="text-muted text-uppercase fw-bold">Total Compute</small>
+                    <div class="h4 mb-0">{{ metrics.total_compute }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-3">
+                    <small class="text-muted text-uppercase fw-bold">Memory Allocated</small>
+                    <div class="h4 mb-0">{{ metrics.memory_allocated }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-3">
+                    <small class="text-muted text-uppercase fw-bold">Cloud Spend</small>
+                    <div class="h4 mb-0">{{ metrics.cloud_spend }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-3">
+                    <small class="text-muted text-uppercase fw-bold">Active Nodes</small>
+                    <div class="h4 mb-0 text-success">{{ metrics.active_nodes }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12">
+            <h5 class="mb-3">Kubernetes Clusters</h5>
+            <div class="row g-4">
+                {% for cluster in clusters %}
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100 {% if cluster.status == 'Warning' %}border-warning{% endif %}">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between mb-2">
+                                <h6 class="mb-0">{{ cluster.name }}</h6>
+                                <span class="badge {% if cluster.status == 'Healthy' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                    {{ cluster.status }}
+                                </span>
+                            </div>
+                            <small class="text-muted d-block mb-3">☁️ {{ cluster.provider }} • {{ cluster.region }}</small>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span>CPU Usage</span>
+                                    <span>{{ cluster.cpu }}%</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar {% if cluster.cpu > 80 %}bg-warning{% else %}bg-primary{% endif %}" style="width: {{ cluster.cpu }}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span>Memory</span>
+                                    <span>{{ cluster.mem }}%</span>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar {% if cluster.mem > 80 %}bg-warning{% else %}bg-primary{% endif %}" style="width: {{ cluster.mem }}%"></div>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-ghost btn-sm w-100 mt-2 border">Manage Cluster</button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

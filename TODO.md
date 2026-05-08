@@ -5,66 +5,49 @@
 This file is the active execution list for the repository.
 It should be read together with `CLAUDE.md`.
 
-## Highest priority
+## Recently Completed
 
-### 1. Documentation alignment
-- [ ] update README so it matches the current modular FastAPI app
-- [ ] document the real route map and current product surfaces
-- [ ] remove or rewrite stale references to the old single-file MVP
+### 1. Backend Routes & Service Wiring
+- [x] implemented `/health` with database check
+- [x] implemented `/dashboard/feed` and `/dashboard/test-webhook`
+- [x] implemented `/api/events`, `/api/itwins`, `/api/imodels`, `/api/integrations`
+- [x] implemented `/api/admin/summary` and `/api/mobile/summary`
+- [x] implemented `/api/launch-readiness` and `/api/control-plane`
+- [x] implemented `/api/agent/explain-health`
 
-### 2. Launch readiness
-- [ ] add or improve a launch-readiness page and API
-- [ ] show blockers for domain, Bentley credentials, webhook security, cookies, DB backend, observability, legal pages, and alert routing
-- [ ] make launch readiness visible from the main admin / operations flow
+### 2. Model & Data Hardening
+- [x] added `ControlPlaneModule` and `LaunchCheck` SQLModel tables
+- [x] enhanced `app/db/seed.py` with robust initial data for all modules
+- [x] replaced weak stubs with database-driven service layers
 
-### 3. Mobile Ops hardening
-- [ ] improve the Mobile Ops screens for alarms, monitors, reports, admin, more, and integrations
-- [ ] replace weak stubs with stronger seeded data and richer operational summaries
-- [ ] keep Mobile Ops tightly linked to the existing event / resource / integration models
+### 3. Launch Readiness & Control Plane
+- [x] built full backend logic for Launch Readiness checks
+- [x] added Control Plane sub-pages (Website Studio, Infrastructure, Environments)
+- [x] wired frontend templates to new backend services
 
-### 4. Admin and service configuration
-- [ ] expose clearer admin controls for service setup
-- [ ] support website chat provider readiness
-- [ ] support browser notification readiness
-- [ ] support admin alert delivery readiness
-- [ ] support observability provider readiness
+### 4. Documentation & Cleanup
+- [x] aligned `README.md` and `TODO.md` with the current modular FastAPI app
+- [x] removed stale prototype files and extraction directories
 
-### 5. Control plane expansion
-- [ ] add or deepen Website Studio
-- [ ] add or deepen Infrastructure Console
-- [ ] add or deepen Marketplace and News
-- [ ] add or deepen Client Delivery
-- [ ] add or deepen platform flow / operations status
+## Remaining / Future Priority
 
-### 6. Deployment readiness
-- [ ] keep Docker runtime aligned with `app.main:app`
-- [ ] keep Azure DevOps / AKS scaffold files coherent
-- [ ] improve Helm templates where they are still baseline-only
-- [ ] document required secrets, service connections, and environment setup
+### 1. Advanced Service Configuration
+- [ ] add deeper admin controls for browser notification setup
+- [ ] expand observability provider integrations (Sentry/Datadog)
+- [ ] add support for client delivery and marketplace billing surfaces
+
+### 2. UI/UX Refinement
+- [ ] improve real-time updates for the dashboard feed using WebSockets
+- [ ] enhance mobile-responsive views for complex data tables
+- [ ] add more interactive charts to the Infrastructure Console
+
+### 3. Deployment & CI/CD
+- [ ] refine Helm templates for production-grade AKS deployment
+- [ ] add integration tests for third-party webhook signature verification
 
 ## Product rules
 
-- [ ] preserve Bentley-native operations identity
-- [ ] preserve modular `app/` runtime structure
-- [ ] do not collapse the app into a single landing page
-- [ ] keep admin, integrations, Mobile Ops, and deployment surfaces visible in the platform
-
-## Nice-to-have after core stabilization
-
-- [ ] improve charts and visual analytics
-- [ ] add deeper client portal concepts
-- [ ] expand marketplace / news surfaces
-- [ ] expand billing / wallet / monetization concepts
-- [ ] expand Cloudflare / security control surfaces
-
-## Working note for Claude / VS Code assistants
-
-Before changing architecture, first inspect:
-- `app/main.py`
-- `app/api/routes/`
-- `app/templates/`
-- `app/static/`
-- `CLAUDE.md`
-- this `TODO.md`
-
-Then continue from the current platform reality instead of restarting the project.
+- [x] preserve Bentley-native operations identity
+- [x] preserve modular `app/` runtime structure
+- [x] do not collapse the app into a single landing page
+- [x] keep admin, integrations, Mobile Ops, and deployment surfaces visible in the platform

@@ -42,7 +42,7 @@ DEMO_EVENTS = [
 ]
 
 
-@router.get("/events", response_model=EventsResponse, tags=["Events"])
+@router.get("/api/events", response_model=EventsResponse, tags=["Events"])
 async def list_events(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
@@ -90,14 +90,14 @@ async def list_events(
     events = result.scalars().all()
 
     return EventsResponse(
-        events=[EventOut.from_orm(e) for e in events],
+        events=[EventOut.model_validate(e) for e in events],
         total=total,
         page=page,
         page_size=page_size,
     )
 
 
-@router.get("/events/export", tags=["Events"])
+@router.get("/api/events/export", tags=["Events"])
 async def export_events_csv(
     event_type: Optional[str] = None,
     category: Optional[str] = None,
@@ -194,7 +194,7 @@ async def delete_old_events(
     return {"deleted": count, "cutoff": cutoff.isoformat(), "days": days}
 
 
-@router.get("/events/{event_id}", tags=["Events"])
+@router.get("/api/events/{event_id}", tags=["Events"])
 async def get_event(event_id: str, session: AsyncSession = Depends(get_session)):
     result = await session.execute(select(Event).where(Event.id == event_id))
     event = result.scalars().first()
@@ -207,6 +207,6 @@ async def get_event(event_id: str, session: AsyncSession = Depends(get_session))
         except Exception:
             pass
     return {
-        **EventOut.from_orm(event).dict(),
+        **EventOut.model_validate(event).model_dump(),
         "raw_payload": raw,
     }

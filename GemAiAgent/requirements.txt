@@ -1,6 +1,0 @@
-fastapi
-uvicorn[standard]
-requests
-fastapi
-requests
-uvicorn[standard]
