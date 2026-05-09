@@ -1,0 +1,9 @@
+name = "bentley-mcp"
+main = "src/mcp/index.ts"
+compatibility_date = "2025-04-29"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bentley_webpage_db"
+database_id = "ca941730-2710-4a87-837a-b6c89297f30a"
