@@ -30,9 +30,14 @@ templates = Jinja2Templates(directory="app/templates")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    await init_db()
-    await seed_initial_data()
-    logger.info("Database ready")
+    app.state.db_startup_error = None
+    try:
+        await init_db()
+        await seed_initial_data()
+        logger.info("Database ready")
+    except Exception as exc:
+        app.state.db_startup_error = str(exc)
+        logger.exception("Database startup failed; continuing in degraded mode")
     yield
     logger.info("Shutdown complete")
 
@@ -116,18 +121,21 @@ app.include_router(agent.router)
 async def health():
     from app.db.database import AsyncSessionLocal
     from sqlalchemy import text
-    db_ok = True
+    startup_error = getattr(app.state, "db_startup_error", None)
+    db_ok = startup_error is None
     try:
         async with AsyncSessionLocal() as session:
             await session.execute(text("SELECT 1"))
-    except Exception:
+    except Exception as exc:
         db_ok = False
+        startup_error = startup_error or str(exc)
     return {
         "status": "healthy" if db_ok else "degraded",
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "database": "ok" if db_ok else "error",
+        "database_error": startup_error,
         "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         "bentley_configured": bool(settings.BENTLEY_CLIENT_ID),
     }
