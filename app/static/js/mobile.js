@@ -282,6 +282,112 @@
     }
   }
 
+  let imodelsState = {
+    allIModels: [],
+    sortMode: 'recent',
+  };
+
+  async function initIModelsPage() {
+    await refreshSummary();
+    const host = document.getElementById('mobileIModelsGrid');
+    if (!host) return;
+    try {
+      const data = await getJson('/api/imodels');
+      imodelsState.allIModels = data.imodels || [];
+
+      const sel = document.getElementById('stateFilterMobile');
+      if (sel) {
+        const current = sel.value;
+        const existing = Array.from(sel.options || []).map(o => o.value);
+        (data.states || []).forEach(s => {
+          if (!existing.includes(s)) {
+            const opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+            sel.appendChild(opt);
+          }
+        });
+        if (current) sel.value = current;
+      }
+
+      renderIModelCards();
+    } catch (err) {
+      host.innerHTML = `<div class="mobile-empty">${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderIModelCards() {
+    const host = document.getElementById('mobileIModelsGrid');
+    if (!host) return;
+
+    const q = (document.getElementById('mobileIModelSearch')?.value || '').toLowerCase();
+    const stateVal = document.getElementById('stateFilterMobile')?.value || '';
+
+    let items = imodelsState.allIModels.filter(m => {
+      const matchQ = !q || (m.display_name || '').toLowerCase().includes(q) ||
+        (m.id || '').toLowerCase().includes(q) ||
+        (m.itwin_name || '').toLowerCase().includes(q);
+      const matchState = !stateVal || m.state === stateVal;
+      return matchQ && matchState;
+    });
+
+    if (imodelsState.sortMode === 'name') {
+      items.sort((a, b) => (a.display_name || a.id || '').localeCompare(b.display_name || b.id || ''));
+    } else if (imodelsState.sortMode === 'events') {
+      items.sort((a, b) => (b.event_count || 0) - (a.event_count || 0));
+    } else {
+      items.sort((a, b) => {
+        const aTime = a.last_event_at ? new Date(a.last_event_at).getTime() : 0;
+        const bTime = b.last_event_at ? new Date(b.last_event_at).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+
+    if (!imodelsState.allIModels.length) {
+      host.innerHTML = '<div class="mobile-empty">No iModels discovered yet.</div>';
+      return;
+    }
+
+    if (!items.length) {
+      host.innerHTML = '<div class="mobile-empty">No iModels match your filters.</div>';
+      return;
+    }
+
+    host.innerHTML = items.map(m => {
+      const lastStr = m.last_event_at ? timeAgo(new Date(m.last_event_at)) : 'Never';
+      const state = m.state || 'unknown';
+      const name = esc(m.display_name || ('iModel-' + (m.id || '').slice(0, 8)));
+      const iTwinName = esc(m.itwin_name || m.itwin_id || '—');
+      return `
+        <article class="mobile-list-item">
+          <div class="top">
+            <div>
+              <div class="title">${name}</div>
+              <div class="meta">${iTwinName}</div>
+            </div>
+            <span class="mobile-severity ${esc(state)}">${esc(state)}</span>
+          </div>
+          <div class="meta">Events: ${m.event_count || 0} • Last: ${lastStr}</div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function filterIModels() {
+    renderIModelCards();
+  }
+
+  function setSortIModels(mode, btn) {
+    imodelsState.sortMode = mode;
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderIModelCards();
+  }
+
+  async function refreshIModels() {
+    await initIModelsPage();
+  }
+
   async function refreshPage() {
     const page = document.querySelector('[data-mobile-page]')?.dataset.mobilePage;
     if (page === 'alarms') return initAlarmsPage();
@@ -290,6 +396,7 @@
     if (page === 'admin') return initAdminPage();
     if (page === 'more') return initMorePage();
     if (page === 'integrations') return initIntegrationsPage();
+    if (page === 'imodels') return initIModelsPage();
     return refreshSummary();
   }
 
@@ -301,9 +408,13 @@
     initAdminPage,
     initMorePage,
     initIntegrationsPage,
+    initIModelsPage,
     triggerTestAlert,
     saveTimezone,
     saveTabs,
     filterIntegrations,
+    filterIModels,
+    setSortIModels,
+    refreshIModels,
   };
 })();
