@@ -16,6 +16,7 @@ from app.core.logging_config import setup_logging
 from app.db.database import init_db
 from app.api.routes import auth, dashboard, events, webhooks, admin
 from app.api.routes import integrations, itwins, mobile, imodels, tasks
+from app.api.routes import launch_readiness, control_plane, agent
 from app.db.seed import seed_initial_data
 from app.models import integrations as _integrations_model  # ensure table is registered
 from app.models import tasks as _tasks_model  # ensure table is registered
