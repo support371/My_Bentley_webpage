@@ -1,28 +1,46 @@
-# Bentley iTwin Operations Center
+# Bentley iTwin Operations Center - Complete Platform
 
-A modular FastAPI platform for Bentley iTwin webhook operations, event intelligence, and enterprise integration orchestration.
+A modern, full-stack application for Bentley iTwin webhook operations, event intelligence, and enterprise integration orchestration with a modern React-based frontend.
 
 ## Stack
 
+### Backend
 - **Runtime**: Python 3.11+ / FastAPI + Uvicorn
 - **Database**: SQLite (dev) / PostgreSQL (production) via SQLModel + asyncpg/aiosqlite
 - **Auth**: JWT cookie sessions with role-based access (admin / viewer)
-- **Frontend**: Jinja2 templates + Vanilla JS (no build step required)
+- **WebSockets**: Real-time event streaming and notifications
 - **Deployment**: Docker / Azure Kubernetes Service (AKS) + Helm / Vercel (Node proxy)
+
+### Frontend (NEW)
+- **Framework**: Next.js 16 with React 19 and TypeScript
+- **Styling**: Tailwind CSS v4 with custom dark theme
+- **State Management**: Zustand for auth and UI state
+- **API Client**: Axios with interceptors
+- **Real-time**: WebSocket integration for live updates
+- **Charts**: Recharts for data visualization
+- **Components**: Custom shadcn/ui components
 
 ## Platform Surfaces
 
+### Frontend (React/Next.js)
 | Surface | URL | Description |
 |---------|-----|-------------|
-| Dashboard | `/dashboard` | Event KPIs, trend chart, recent events feed |
-| Events | `/events-view` | Full event table with filters |
-| iTwins | `/itwins-view` | Connected iTwin registry |
-| iModels | `/imodels-view` | iModel explorer with state filters |
-| Integrations | `/integrations` | 28-service integration catalog |
-| Mobile Ops | `/mobile` | Mobile-optimized ops view (alarms, monitors, reports) |
-| Admin | `/admin` | Alert rules, user management, Bentley diagnostics |
-| Launch Readiness | `/admin/launch-readiness` | Platform production checklist |
-| Control Plane | `/control-plane` | Enterprise execution layer (Website Studio, Infra) |
+| Login | `/auth/login` | Modern authentication with OAuth support |
+| Dashboard | `/dashboard` | Real-time KPIs, charts, and event feed |
+| Projects | `/projects` | Project management with detail views |
+| iModels | `/imodels` | iModel catalog with sync status |
+| iTwins | `/itwins` | Digital twin management |
+| Events | `/events` | Real-time event log with filtering |
+| Settings | `/settings` | User preferences and account |
+| Admin | `/admin` | User management, audit logs, platform settings |
+
+### Backend (FastAPI) - Legacy URLs Still Supported
+| Surface | URL | Description |
+|---------|-----|-------------|
+| Dashboard Feed | `/dashboard/feed` | Legacy API endpoint for data |
+| Events API | `/api/events` | Event endpoints (also consumed by React) |
+| Mobile Ops | `/mobile` | Mobile-optimized view (legacy) |
+| Control Plane | `/control-plane` | Enterprise execution layer |
 
 ## API Endpoints
 
@@ -87,6 +105,23 @@ PUBLIC_BASE_URL=https://your-domain.com
 
 ## Running Locally
 
+### Frontend (Next.js)
+
+```bash
+# Install dependencies
+npm install
+
+# Create environment file
+cp .env.example .env.local
+
+# Start development server
+npm run dev
+```
+
+Frontend runs on `http://localhost:3000`
+
+### Backend (FastAPI)
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -98,7 +133,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
 python run.py
 ```
 
-Default admin credentials (dev seed): `admin@example.com` / `admin123`
+Backend API runs on `http://localhost:5000`
+
+**Default credentials** (dev seed): `admin@example.com` / `admin123`
 
 ## Docker
 
@@ -123,6 +160,46 @@ bash smoke-test.sh
 
 ## Project Structure
 
+### Frontend (Next.js + React)
+
+```
+/app                          # Next.js App Router
+├── (dashboard)/              # Protected dashboard routes
+│   ├── dashboard/            # Main dashboard with KPIs
+│   ├── projects/             # Project management
+│   │   └── [id]/             # Project detail page
+│   ├── imodels/              # iModel catalog
+│   ├── itwins/               # Digital twin management
+│   ├── events/               # Real-time event log
+│   ├── admin/                # Admin panel
+│   ├── settings/             # User settings
+│   └── layout.tsx            # Dashboard wrapper layout
+├── auth/login/               # Public login page
+├── page.tsx                  # Root redirect
+└── layout.tsx                # Root layout with notifications
+
+/components                   # Reusable React components
+├── ui/                       # shadcn/ui components
+│   ├── button.tsx
+│   ├── input.tsx
+│   ├── card.tsx
+│   └── dialog.tsx
+├── sidebar.tsx               # Navigation sidebar
+├── header.tsx                # Top navigation
+├── project-card.tsx          # Project card
+├── stat-card.tsx             # Stats display
+└── notification-center.tsx   # Toast notifications
+
+/lib                          # Utilities
+├── api.ts                    # Axios API client
+├── store.ts                  # Zustand state stores
+├── websocket.ts              # WebSocket client
+├── notifications.ts          # Notification system
+└── utils.ts                  # Helpers
+```
+
+### Backend (FastAPI)
+
 ```
 app/
 ├── main.py                    # FastAPI app, middleware, error handlers
@@ -134,20 +211,16 @@ app/
 │   └── seed.py                # Dev seed data
 ├── models/                    # SQLModel table definitions
 ├── api/routes/                # FastAPI route modules
-│   ├── admin.py               # Admin, alert rules, user management
-│   ├── auth.py                # Login/logout
-│   ├── dashboard.py           # Dashboard + chart endpoints
-│   ├── events.py              # Event ingestion and listing
-│   ├── imodels.py             # iModel explorer
-│   ├── integrations.py        # Integration catalog
-│   ├── itwins.py              # iTwin registry
-│   ├── launch_readiness.py    # Production readiness checks
-│   ├── mobile.py              # Mobile Ops pages + API
-│   ├── control_plane.py       # Enterprise control plane routes
+│   ├── admin.py               # Admin endpoints
+│   ├── auth.py                # Authentication
+│   ├── dashboard.py           # Dashboard data
+│   ├── events.py              # Event management
+│   ├── imodels.py             # iModel endpoints
+│   ├── itwins.py              # iTwin endpoints
 │   └── webhooks.py            # Webhook intake
 ├── services/
-│   ├── alerts/engine.py       # Multi-channel alert dispatch
-│   ├── bentley/               # Bentley API client + diagnostics
-│   └── event_processor.py     # Dashboard stats aggregation
-└── templates/                 # Jinja2 HTML templates
+│   ├── alerts/engine.py       # Alert dispatch
+│   ├── bentley/               # Bentley API integration
+│   └── event_processor.py     # Event aggregation
+└── templates/                 # Legacy Jinja2 templates
 ```

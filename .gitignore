@@ -31,3 +31,18 @@ logs/
 *.sqlite
 .DS_Store
 node_modules/
+
+# Next.js
+.next/
+out/
+*.module.css.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Vercel
+.vercel/
+
+# Environment
+.env.local
+.env.*.local
