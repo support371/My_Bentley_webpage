@@ -282,6 +282,29 @@
   font-size: 1rem;
 }
 
+.sort-btn {
+  padding: .4rem .75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-size: .8rem;
+  color: var(--text-muted);
+  transition: all .2s ease;
+  font-weight: 600;
+}
+
+.sort-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sort-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
 @media (min-width: 760px) {
   .mobile-shell {
     max-width: 980px;

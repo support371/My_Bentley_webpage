@@ -244,23 +244,8 @@ async def chart_trend(
     q = text(f"SELECT {trunc} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket")
     result = await session.execute(q, {"since": since})
     rows = result.fetchall()
-        trunc_sql = "to_timestamp(floor(extract(epoch from received_at) / 300) * 300) AT TIME ZONE 'UTC'"
-        step = timedelta(minutes=5)
-        fmt = "%H:%M"
-    elif hours <= 168:
-        trunc_sql = "date_trunc('hour', received_at)"
-        step = timedelta(hours=1)
-        fmt = "%a %H:%M" if hours > 24 else "%H:%M"
-    else:
-        trunc_sql = "date_trunc('day', received_at)"
-        step = timedelta(days=1)
-        fmt = "%b %d"
 
-    result = await session.execute(
-        text(f"SELECT {trunc_sql} AS bucket, COUNT(*) AS cnt FROM events WHERE received_at >= :since GROUP BY bucket ORDER BY bucket"),
-        {"since": since},
-    )
-    cat_rows = categories_result.fetchall()
+    return {"labels": [r[0] for r in rows], "values": [r[1] for r in rows]}
 
     labels = [row.bucket for row in rows]
     counts = [int(row.cnt) for row in rows]

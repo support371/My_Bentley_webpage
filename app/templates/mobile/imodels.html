@@ -1,0 +1,39 @@
+{% extends "mobile/base_mobile.html" %}
+
+{% block title %}Mobile iModel Explorer — {{ app_name }}{% endblock %}
+{% block mobile_title %}iModel Explorer{% endblock %}
+{% block mobile_subtitle %}Digital models linked to iTwin projects{% endblock %}
+
+{% block mobile_body %}
+<section class="mobile-card">
+  <div class="mobile-card-head">
+    <h2>Live</h2>
+    <button class="mobile-action-btn" onclick="window.MobileOps.refreshIModels()">↻ Refresh</button>
+  </div>
+  <div class="mobile-filter-row">
+    <input
+      type="search"
+      id="mobileIModelSearch"
+      placeholder="🔍 Search iModels…"
+      oninput="window.MobileOps.filterIModels()"
+    />
+  </div>
+  <div style="display: flex; gap: 0.4rem; margin-bottom: 0.9rem; flex-wrap: wrap;">
+    <button class="sort-btn active" id="sortRecent" onclick="window.MobileOps.setSortIModels('recent', this)">Recent</button>
+    <button class="sort-btn" id="sortName" onclick="window.MobileOps.setSortIModels('name', this)">Name</button>
+    <button class="sort-btn" id="sortEvents" onclick="window.MobileOps.setSortIModels('events', this)">Events</button>
+  </div>
+  <select class="mobile-form-grid" id="stateFilterMobile" onchange="window.MobileOps.filterIModels()" style="margin-bottom: 0.9rem;">
+    <option value="">All States</option>
+  </select>
+  <div id="mobileIModelsGrid" class="mobile-list-stack">
+    <div class="mobile-empty">Loading iModels…</div>
+  </div>
+</section>
+{% endblock %}
+
+{% block mobile_scripts %}
+<script>
+window.MobileOps.initIModelsPage();
+</script>
+{% endblock %}

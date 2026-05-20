@@ -302,6 +302,12 @@ async def mobile_integrations_page(request: Request, session: AsyncSession = Dep
     return templates.TemplateResponse("mobile/integrations.html", {"request": request, "user": user, "app_name": settings.APP_NAME, "active_mobile_tab": "integrations"})
 
 
+@router.get("/mobile/imodels", response_class=HTMLResponse, tags=["Mobile"])
+async def mobile_imodels_page(request: Request, session: AsyncSession = Depends(get_session)):
+    user = get_optional_user(request)
+    return templates.TemplateResponse("mobile/imodels.html", {"request": request, "user": user, "app_name": settings.APP_NAME, "active_mobile_tab": "imodels"})
+
+
 @router.get("/api/mobile/summary", tags=["Mobile"])
 async def mobile_summary(timeRange: str = Query(default="24h"), session: AsyncSession = Depends(get_session)):
     return await build_mobile_summary(session, timeRange)
