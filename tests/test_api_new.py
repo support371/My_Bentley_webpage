@@ -14,7 +14,7 @@ async def test_dashboard_feed(client):
 
 @pytest.mark.asyncio
 async def test_api_events(client):
-    response = await client.get("/events")
+    response = await client.get("/api/events")
     assert response.status_code == 200
     assert "events" in response.json()
 
