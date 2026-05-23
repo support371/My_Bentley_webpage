@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.db.database import get_session
 from app.models.auth import User
 from app.models.events import AuditLog
-from app.core.security import verify_password, create_token
+from app.core.security import verify_password, create_token, hash_password
 from app.core.config import settings
 
 router = APIRouter()
@@ -75,6 +75,64 @@ async def login(
         samesite="lax",
     )
     return response
+
+
+@router.post("/api/register", tags=["Auth"])
+async def register(request: Request, session: AsyncSession = Depends(get_session)):
+    """Public account registration endpoint with auto-login."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON request body")
+    
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    full_name = body.get("full_name", "").strip()
+    ip_address = request.client.host if request.client else "unknown"
+    
+    # Validation
+    if not email:
+        raise HTTPException(status_code=422, detail="email is required")
+    if not password:
+        raise HTTPException(status_code=422, detail="password is required")
+    if len(password) < 8:
+        raise HTTPException(status_code=422, detail="password must be at least 8 characters")
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=422, detail="invalid email format")
+    
+    # Check if user already exists
+    existing = await session.execute(select(User).where(User.email == email))
+    if existing.scalars().first():
+        await _write_audit(session, "register.duplicate", None, ip_address, f"email={email}")
+        raise HTTPException(status_code=409, detail="A user with that email already exists")
+    
+    try:
+        user = User(
+            email=email,
+            hashed_password=hash_password(password),
+            full_name=full_name,
+            role="viewer",
+            is_active=True,
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        await _write_audit(session, "register.success", user.id, ip_address, f"email={email}")
+        
+        # Auto-login after registration
+        token = create_token({"sub": user.id, "email": user.email, "role": user.role})
+        return {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "access_token": token,
+            "created_at": user.created_at.isoformat()
+        }
+    except Exception as e:
+        await session.rollback()
+        await _write_audit(session, "register.failed", None, ip_address, f"email={email}, error={str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create account")
 
 
 @router.get("/logout", tags=["Auth"])
