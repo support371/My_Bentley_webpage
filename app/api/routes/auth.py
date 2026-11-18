@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.db.database import get_session
 from app.models.auth import User
 from app.models.events import AuditLog
-from app.core.security import verify_password, create_token
+from app.core.security import verify_password, create_token, require_admin
 from app.core.config import settings
 
 router = APIRouter()
@@ -96,7 +96,7 @@ async def logout(request: Request, session: AsyncSession = Depends(get_session))
 # ── User Management API ────────────────────────────────────────────────────────
 
 @router.get("/api/users", tags=["Users"])
-async def list_users(session: AsyncSession = Depends(get_session)):
+async def list_users(session: AsyncSession = Depends(get_session), admin: dict = Depends(require_admin)):
     result = await session.execute(
         select(User).order_by(User.created_at.desc())
     )
@@ -119,7 +119,7 @@ async def list_users(session: AsyncSession = Depends(get_session)):
 
 
 @router.post("/api/users", tags=["Users"])
-async def create_user(request: Request, session: AsyncSession = Depends(get_session)):
+async def create_user(request: Request, session: AsyncSession = Depends(get_session), admin: dict = Depends(require_admin)):
     body = await request.json()
     email = body.get("email", "").strip().lower()
     password = body.get("password", "")
@@ -142,7 +142,7 @@ async def create_user(request: Request, session: AsyncSession = Depends(get_sess
 
 
 @router.put("/api/users/{user_id}", tags=["Users"])
-async def update_user(user_id: str, request: Request, session: AsyncSession = Depends(get_session)):
+async def update_user(user_id: str, request: Request, session: AsyncSession = Depends(get_session), admin: dict = Depends(require_admin)):
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
     if not user:
@@ -160,7 +160,7 @@ async def update_user(user_id: str, request: Request, session: AsyncSession = De
 
 
 @router.post("/api/users/{user_id}/reset-password", tags=["Users"])
-async def reset_password(user_id: str, request: Request, session: AsyncSession = Depends(get_session)):
+async def reset_password(user_id: str, request: Request, session: AsyncSession = Depends(get_session), admin: dict = Depends(require_admin)):
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
     if not user:
@@ -176,7 +176,7 @@ async def reset_password(user_id: str, request: Request, session: AsyncSession =
 
 
 @router.delete("/api/users/{user_id}", tags=["Users"])
-async def delete_user(user_id: str, session: AsyncSession = Depends(get_session)):
+async def delete_user(user_id: str, session: AsyncSession = Depends(get_session), admin: dict = Depends(require_admin)):
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
     if not user:
